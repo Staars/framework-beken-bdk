@@ -546,6 +546,12 @@ void prvClearQueuedMsg( Timer_t *pxTimer )
 	}
 }
 
+uint8_t pcTimerGetState(TimerHandle_t xTimer)
+{
+	Timer_t *pxTimer = ( Timer_t * ) xTimer;
+
+	return pxTimer->state;
+}
 #endif
 
 static void prvProcessExpiredTimer( const TickType_t xNextExpireTime, const TickType_t xTimeNow )

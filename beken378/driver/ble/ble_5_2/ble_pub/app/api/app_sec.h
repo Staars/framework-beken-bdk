@@ -37,11 +37,40 @@
  * DEFINES
  ****************************************************************************************
  */
+typedef enum{
+	APP_SEC_ERROR_NO_ERROR,
+	APP_SEC_ERROR_PARAM_INVALID,
+	APP_SEC_ERROR_PARAM_UNSUPPORT,
+}sec_err_t;
+
+typedef enum{
+	APP_SEC_PAIRING_SUCCEED,
+	APP_SEC_PAIRING_FAILED,
+	APP_SEC_MAX,
+}sec_notice_t;
+
+typedef void (*sec_notice_cb_t)(sec_notice_t notice, void *param);
 
 /*
  * STRUCTURES DEFINITIONS
  ****************************************************************************************
  */
+struct app_pairing_cfg
+{
+    /// IO capabilities (@see gap_io_cap)
+    uint8_t iocap;
+    /// Authentication (@see gap_auth)
+    /// Note in BT 4.1 the Auth Field is extended to include 'Key Notification' and
+    /// in BT 4.2 the Secure Connections'.
+    uint8_t auth;
+    ///Initiator key distribution (@see gap_kdist)
+    uint8_t ikey_dist;
+    ///Responder key distribution (@see gap_kdist)
+    uint8_t rkey_dist;
+
+    /// Device security requirements (minimum security level). (@see gap_sec_req)
+    uint8_t sec_req;
+};
 
 struct app_sec_env_tag
 {
@@ -65,6 +94,9 @@ struct app_sec_env_tag
 	//@trc_union parent.info == GAPC_CSRK_EXCH
 	struct gap_sec_key csrk;
 	struct gap_sec_key peer_csrk;
+
+	struct app_pairing_cfg pairing_param;
+	sec_notice_cb_t sec_notice_cb;
 };
 
 /*
@@ -89,6 +121,13 @@ extern const struct app_subtask_handlers app_sec_handlers;
  ****************************************************************************************
  */
 void app_sec_init(void);
+
+/**
+ ****************************************************************************************
+ * @brief Set pairing param and cb function
+ ****************************************************************************************
+ */
+uint8_t app_sec_config(struct app_pairing_cfg *param, sec_notice_cb_t func);
 
 /**
  ****************************************************************************************

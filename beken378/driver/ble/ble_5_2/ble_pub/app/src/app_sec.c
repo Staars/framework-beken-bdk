@@ -69,14 +69,61 @@ void app_sec_init(void)
 		}
 	}
 	app_sec_env.peer_pairing_recv = false;
-	app_sec_env.peer_encrypt_recv = false;	
+	app_sec_env.peer_encrypt_recv = false;
 	#else
 	app_sec_env.bonded = false;
 	app_sec_env.peer_pairing_recv = false;
 	app_sec_env.peer_encrypt_recv = false;
 	app_sec_env.passkey = SEC_TK_PASSKEY;
 	#endif
-		
+
+	app_sec_env.sec_notice_cb = NULL;
+	app_sec_env.pairing_param.sec_req = GAP_NO_SEC;
+
+	app_sec_env.pairing_param.iocap = GAP_IO_CAP_NO_INPUT_NO_OUTPUT;
+	app_sec_env.pairing_param.auth = GAP_AUTH_REQ_NO_MITM_NO_BOND;
+	app_sec_env.pairing_param.ikey_dist = GAP_KDIST_NONE;
+	app_sec_env.pairing_param.rkey_dist = GAP_KDIST_NONE;
+}
+
+uint8_t app_sec_config(struct app_pairing_cfg *param, sec_notice_cb_t func)
+{
+	uint8_t status = APP_SEC_ERROR_NO_ERROR;
+
+	if (param->sec_req == GAP_NO_SEC) {
+		status = APP_SEC_ERROR_PARAM_INVALID;
+	} else if (param->sec_req == GAP_SEC1_NOAUTH_PAIR_ENC) {
+		if (param->auth & GAP_AUTH_MITM) {
+			status = APP_SEC_ERROR_PARAM_INVALID;
+		}
+	} else if (param->sec_req == GAP_SEC1_AUTH_PAIR_ENC) {
+		if (!(param->auth & GAP_AUTH_MITM)) {
+			status = APP_SEC_ERROR_PARAM_INVALID;
+		}
+	#if BLE_APP_SEC_CON
+	} else if (param->sec_req == GAP_SEC1_SEC_CON_PAIR_ENC){
+		if (!(param->auth & GAP_AUTH_MITM) || !(param->auth & GAP_AUTH_SEC_CON)) {
+			status = APP_SEC_ERROR_PARAM_INVALID;
+		}
+	#endif
+	} else {
+		//TODO LE security mode 2
+		status = APP_SEC_ERROR_PARAM_UNSUPPORT;
+	}
+
+	if (status) {
+		BLE_ASSERT_WARN(0, param->sec_req, param->auth);
+		return status;
+	}
+
+	app_sec_env.sec_notice_cb = func;
+	app_sec_env.pairing_param.sec_req = param->sec_req;
+
+	app_sec_env.pairing_param.iocap = param->iocap;
+	app_sec_env.pairing_param.auth = param->auth;
+	app_sec_env.pairing_param.ikey_dist = param->ikey_dist;
+	app_sec_env.pairing_param.rkey_dist = param->rkey_dist;
+	return status;
 }
 
 bool app_sec_get_bond_status(void)
@@ -92,6 +139,7 @@ bool app_sec_peer_pairing_recv(void)
 bool app_sec_set_tk_passkey(uint32_t passkey)
 {
 	if( passkey > 999999) {
+		BLE_ASSERT_WARN(0, passkey, 0);
 		return false;
 	}
 	app_sec_env.passkey = passkey;
@@ -137,14 +185,14 @@ void app_sec_send_security_req(uint8_t conidx)
 	}
 
 	if(!app_sec_peer_encrypt_recv() && !app_sec_peer_pairing_recv())
-	{		
+	{
 		struct gapc_security_cmd *cmd = KERNEL_MSG_ALLOC(GAPC_SECURITY_CMD,
 													KERNEL_BUILD_ID(TASK_BLE_GAPC, conhdl), TASK_BLE_APP,
 													gapc_security_cmd);
 
 		cmd->operation = GAPC_SECURITY_REQ;
 
-		cmd->auth      = GAP_AUTH_REQ_MITM_BOND;
+		cmd->auth      = app_sec_env.pairing_param.auth;
 
 		// Send the message
 		kernel_msg_send(cmd);
@@ -168,13 +216,14 @@ void app_sec_send_bond_cmd(uint8_t conidx)
 
     cmd->operation = GAPC_BOND;
 
-    cmd->pairing.auth      = GAP_AUTH_REQ_MITM_BOND;
-    cmd->pairing.iocap     = GAP_IO_CAP_KB_ONLY;
+    cmd->pairing.auth      = app_sec_env.pairing_param.auth;
+    cmd->pairing.iocap     = app_sec_env.pairing_param.iocap;
     cmd->pairing.oob       = GAP_OOB_AUTH_DATA_NOT_PRESENT;
     cmd->pairing.key_size  = 16;
-    cmd->pairing.ikey_dist = GAP_KDIST_ENCKEY | GAP_KDIST_LINKKEY;
-    cmd->pairing.rkey_dist = GAP_KDIST_ENCKEY | GAP_KDIST_LINKKEY;
-    cmd->pairing.sec_req   = GAP_SEC1_AUTH_PAIR_ENC;
+    cmd->pairing.ikey_dist = app_sec_env.pairing_param.ikey_dist;
+    cmd->pairing.rkey_dist = app_sec_env.pairing_param.rkey_dist;
+
+    cmd->pairing.sec_req   = app_sec_env.pairing_param.sec_req;
 
     // Send the message
     kernel_msg_send(cmd);
@@ -221,26 +270,24 @@ static int gapc_bond_req_ind_handler(kernel_msg_id_t const msgid,
     {
         case (GAPC_PAIRING_REQ):
         {
-			app_sec_env.peer_pairing_recv = true;
             cfm->request = GAPC_PAIRING_RSP;
 
             cfm->accept  = false;
 
             // Check if we are already bonded (Only one bonded connection is supported)
-            if (!app_sec_env.bonded)
+            if (!app_sec_env.bonded && app_sec_env.pairing_param.sec_req != GAP_NO_SEC)
             {
                 cfm->accept  = true;
+                app_sec_env.peer_pairing_recv = true;
 
-                cfm->data.pairing_feat.auth      = GAP_AUTH_REQ_MITM_BOND;
-
-                cfm->data.pairing_feat.iocap     = GAP_IO_CAP_DISPLAY_ONLY;
-
-                cfm->data.pairing_feat.key_size  = 16;
+                cfm->data.pairing_feat.iocap     = app_sec_env.pairing_param.iocap;
                 cfm->data.pairing_feat.oob       = GAP_OOB_AUTH_DATA_NOT_PRESENT;
-                cfm->data.pairing_feat.sec_req   = GAP_SEC1_AUTH_PAIR_ENC;
+                cfm->data.pairing_feat.auth      = app_sec_env.pairing_param.auth;
+                cfm->data.pairing_feat.key_size  = 16;
+                cfm->data.pairing_feat.ikey_dist = app_sec_env.pairing_param.ikey_dist;
+                cfm->data.pairing_feat.rkey_dist = app_sec_env.pairing_param.rkey_dist;
 
-                cfm->data.pairing_feat.ikey_dist = GAP_KDIST_ENCKEY | GAP_KDIST_LINKKEY;
-                cfm->data.pairing_feat.rkey_dist = GAP_KDIST_ENCKEY | GAP_KDIST_LINKKEY;
+                cfm->data.pairing_feat.sec_req   = app_sec_env.pairing_param.sec_req;
             }
         } break;
 
@@ -263,7 +310,7 @@ static int gapc_bond_req_ind_handler(kernel_msg_id_t const msgid,
             {
                 cfm->data.ltk.ltk.key[counter]    = (uint8_t)bk_rand();
             }
-			
+
             memcpy(&app_sec_env.ltk,&cfm->data.ltk,sizeof(struct gapc_ltk));
             #if (NVDS_SUPPORT)
             // Store the generated value in NVDS
@@ -272,7 +319,7 @@ static int gapc_bond_req_ind_handler(kernel_msg_id_t const msgid,
             {
                 BLE_ASSERT_ERR(0);
             }
-			#endif// #if (NVDS_SUPPORT)
+            #endif// #if (NVDS_SUPPORT)
         } break;
 
 
@@ -324,8 +371,15 @@ static int gapc_bond_ind_handler(kernel_msg_id_t const msgid,
         case (GAPC_PAIRING_SUCCEED):
         {
             // Update the bonding status in the environment
-            bk_printf("GAPC_PAIRING_SUCCEED\r\n");
-            app_sec_env.bonded = true;
+            if (param->data.pairing.level & GAP_PAIRING_BOND_PRESENT_BIT) {
+                app_sec_env.bonded = true;
+            }
+            if (param->data.pairing.level == GAP_PAIRING_BOND_SECURE_CON) {
+                memcpy(&app_sec_env.ltk, &app_sec_env.peer_ltk, sizeof(struct gapc_ltk));
+            }
+            if (app_sec_env.sec_notice_cb) {
+                app_sec_env.sec_notice_cb(APP_SEC_PAIRING_SUCCEED, NULL);
+            }
         } break;
 
         case (GAPC_REPEATED_ATTEMPT):
@@ -352,7 +406,9 @@ static int gapc_bond_ind_handler(kernel_msg_id_t const msgid,
         {
             app_sec_env.peer_pairing_recv = false;
             app_sec_env.peer_encrypt_recv = false;
-            bk_printf("[warning]GAPC_PAIRING_FAILED\r\n");
+            if (app_sec_env.sec_notice_cb) {
+                app_sec_env.sec_notice_cb(APP_SEC_PAIRING_FAILED, NULL);
+            }
         } break;
 
         case (GAPC_LTK_EXCH):
@@ -402,13 +458,13 @@ static int gapc_encrypt_req_ind_handler(kernel_msg_id_t const msgid,
 
     if (app_sec_env.bonded) {
 
-     // Check if the provided EDIV and Rand Nb values match with the stored values
-     if ((param->ediv == app_sec_env.ltk.ediv) && 
-         !memcmp(&param->rand_nb.nb[0], &app_sec_env.ltk.randnb.nb[0], sizeof(struct rand_nb))) {
-         cfm->found    = true;
-         cfm->key_size = GAP_KEY_LEN;
-         memcpy(&cfm->ltk, &app_sec_env.ltk.ltk, sizeof(struct gap_sec_key));
-     }
+        // Check if the provided EDIV and Rand Nb values match with the stored values
+        if ((param->ediv == app_sec_env.ltk.ediv) &&
+            !memcmp(&param->rand_nb.nb[0], &app_sec_env.ltk.randnb.nb[0], sizeof(struct rand_nb))) {
+            cfm->found    = true;
+            cfm->key_size = GAP_KEY_LEN;
+            memcpy(&cfm->ltk, &app_sec_env.ltk.ltk, sizeof(struct gap_sec_key));
+        }
     }
     // Send the message
     kernel_msg_send(cfm);

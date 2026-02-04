@@ -56,6 +56,7 @@ SECTIONS
     .itcm.code ALIGN(8) :
     {
         *(.text.sctrl_fix_dpll_div)
+        *(.text.flash_bypass_wr_sr_cb)
     } > itcm AT>flash
     _itcmcode_flash_begin = LOADADDR(.itcm.code);
     _itcmcode_ram_begin = ADDR(.itcm.code);

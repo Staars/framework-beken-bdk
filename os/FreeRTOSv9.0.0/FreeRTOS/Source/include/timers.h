@@ -1332,6 +1332,7 @@ uint32_t xTimerGetNextExpireTime(void);
 uint32_t xTimerGetCurrentTimerCount(void);
 
 bool xTimerInTimerTask(void);
+uint8_t pcTimerGetState(TimerHandle_t xTimer);
 
 
 #ifdef __cplusplus

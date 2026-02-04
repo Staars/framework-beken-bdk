@@ -87,6 +87,11 @@ task.h is included from an application file. */
 
 #include "FreeRTOS.h"
 #include "task.h"
+#if CFG_MEM_DEBUG
+#include "doubly_list.h"
+#include "str_pub.h"
+#include "fake_clock_pub.h"
+#endif
 
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
@@ -117,6 +122,13 @@ typedef struct A_BLOCK_LINK
 {
 	struct A_BLOCK_LINK *pxNextFreeBlock;	/*<< The next free block in the list. */
 	size_t xBlockSize;						/*<< The size of the free block. */
+#if CFG_MEM_DEBUG
+	struct list_head node;					/*<< linked to xUsed */
+	unsigned int leakTime;					/*<< the leak time (*1sec)*/
+	char funcName[16];						/*<< the function name */
+	unsigned int line;						/*<< the function line */
+	int wantedSize;							/*<< malloc size */
+#endif
 } BlockLink_t;
 
 /*-----------------------------------------------------------*/
@@ -144,6 +156,9 @@ static const size_t xHeapStructSize	= ( sizeof( BlockLink_t ) + ( ( size_t ) ( p
 
 /* Create a couple of list links to mark the start and end of the list. */
 static BlockLink_t xStart, *pxEnd = NULL;
+#if CFG_MEM_DEBUG
+static struct list_head xUsed;
+#endif
 
 /* Keeps track of the number of free bytes remaining, but says nothing about
 fragmentation. */
@@ -380,7 +395,7 @@ void *pvReturn = NULL;
 	return pvReturn;
 }
 
-#if OSMALLOC_STATISTICAL
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 void *psram_malloc_cm(const char *call_func_name, int line, size_t xWantedSize, int need_zero )
 #else
 void *psram_malloc( size_t xWantedSize )
@@ -393,7 +408,7 @@ void *psram_malloc( size_t xWantedSize )
 
 	vTaskSuspendAll();
 	pvReturn = psram_malloc_without_lock(xWantedSize);
-	#if OSMALLOC_STATISTICAL
+	#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 	{
 	if(pvReturn && call_func_name) {
 	BlockLink_t *pxLink = (BlockLink_t *)((u8*)pvReturn - xHeapStructSize);
@@ -403,7 +418,7 @@ void *psram_malloc( size_t xWantedSize )
 	#endif
 	( void ) xTaskResumeAll();
 
-	#if OSMALLOC_STATISTICAL
+	#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 	if(pvReturn && need_zero)
 		os_memset(pvReturn, 0, xWantedSize);
 	#endif
@@ -603,6 +618,11 @@ void *pvReturn = NULL;
 					by the application and has no "next" block. */
 					pxBlock->xBlockSize |= xBlockAllocatedBit;
 					pxBlock->pxNextFreeBlock = NULL;
+
+#if CFG_MEM_DEBUG
+					list_add_tail(&pxBlock->node, &xUsed);
+#endif
+
 				}
 				else
 				{
@@ -640,7 +660,7 @@ void *pvReturn = NULL;
 	return pvReturn;
 }
 
-#if OSMALLOC_STATISTICAL
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 void *pvPortMalloc_cm(const char *call_func_name, int line, size_t xWantedSize, int need_zero )
 #else
 void *pvPortMalloc( size_t xWantedSize )
@@ -653,17 +673,25 @@ void *pvPortMalloc( size_t xWantedSize )
 
 	vTaskSuspendAll();
 	pvReturn = malloc_without_lock(xWantedSize);
-	#if OSMALLOC_STATISTICAL
+	#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 	{
-	if(pvReturn && call_func_name) {
-	BlockLink_t *pxLink = (BlockLink_t *)((u8*)pvReturn - xHeapStructSize);
-	bk_printf("\r\nm:%p,%d|%s,%d\r\n", pxLink, (pxLink->xBlockSize & ~xBlockAllocatedBit), call_func_name, line);
-	}
+		BlockLink_t *pxLink = (BlockLink_t *)((u8*)pvReturn - xHeapStructSize);
+		if(pvReturn && call_func_name) {
+#if OSMALLOC_STATISTICAL
+			bk_printf("\r\nm:%p,%d|%s,%d\r\n", pxLink, (pxLink->xBlockSize & ~xBlockAllocatedBit), call_func_name, line);
+#endif
+		}
+#if CFG_MEM_DEBUG
+		pxLink->leakTime = fclk_get_second();
+		os_strlcpy(pxLink->funcName, call_func_name, sizeof(pxLink->funcName) - 1);
+		pxLink->line = line;
+		pxLink->wantedSize = xWantedSize;
+#endif
 	}
 	#endif
 	( void ) xTaskResumeAll();
 
-	#if OSMALLOC_STATISTICAL
+	#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 	if(pvReturn && need_zero)
 		os_memset(pvReturn, 0, xWantedSize);
 	#endif
@@ -671,14 +699,14 @@ void *pvPortMalloc( size_t xWantedSize )
 }
 
 /*-----------------------------------------------------------*/
-#if OSMALLOC_STATISTICAL
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 void *vPortFree_cm(const char *call_func_name, int line, void *pv )
 #else
 void vPortFree( void *pv )
 #endif
 {
-uint8_t *puc = ( uint8_t * ) pv;
-BlockLink_t *pxLink;
+	uint8_t *puc = ( uint8_t * ) pv;
+	BlockLink_t *pxLink;
 
 	if( pv != NULL )
 	{
@@ -708,6 +736,12 @@ BlockLink_t *pxLink;
                     bk_printf("\r\nf:%p,%d|%s,%d\r\n", pxLink, pxLink->xBlockSize, call_func_name, line);
                 }
 #endif
+#if CFG_MEM_DEBUG
+				list_del(&pxLink->node);
+				pxLink->leakTime = 0;
+				pxLink->funcName[0] = 0;
+				pxLink->line = 0;
+#endif
 #if (CFG_SOC_NAME == SOC_BK7221U)
 				if (puc > psram_ucHeap)
                 {
@@ -736,7 +770,30 @@ BlockLink_t *pxLink;
 			mtCOVERAGE_TEST_MARKER();
 		}
 	}
+
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
+	return NULL;
+#endif
 }
+
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
+void printLeakMem(int leaktime)
+{
+	BlockLink_t *pxLink;
+	UINT32 now = fclk_get_second();
+
+	vTaskSuspendAll();
+
+	list_for_each_entry(pxLink, &xUsed, node) {
+		if (now - pxLink->leakTime > leaktime)
+			bk_printf("%d,0x%x,%d,%s,%d\r\n", now - pxLink->leakTime,
+				(u8*)pxLink + xHeapStructSize, pxLink->wantedSize,
+				pxLink->funcName, pxLink->line);
+	}
+
+	xTaskResumeAll();
+}
+#endif
 
 /*-----------------------------------------------------------*/
 
@@ -770,7 +827,7 @@ void vPortInitialiseBlocks( void )
 extern unsigned char _empty_ram;
 
 #define HEAP_START_ADDRESS    (void*)&_empty_ram
-#if CFG_SOC_NAME == SOC_BK7231N
+#if (CFG_SOC_NAME == SOC_BK7231N)
 #define HEAP_END_ADDRESS      (void*)(0x00400000 + 192 * 1024)
 #else
 #define HEAP_END_ADDRESS      (void*)(0x00400000 + 256 * 1024)
@@ -781,7 +838,7 @@ static void *prvHeapGetHeaderPointer(void)
 	return (void *)HEAP_START_ADDRESS;
 }
 
-static uint32_t prvHeapGetTotalSize(void)
+size_t prvHeapGetTotalSize(void)
 {
 	ASSERT(HEAP_END_ADDRESS > HEAP_START_ADDRESS);
 	return (HEAP_END_ADDRESS - HEAP_START_ADDRESS);
@@ -881,6 +938,10 @@ static void prvHeapInit( void )
     /* Only one block exists - and it covers the entire usable heap space. */
     psram_xMinimumEverFreeBytesRemaining = pxFirstFreeBlock->xBlockSize;
     psram_xFreeBytesRemaining = pxFirstFreeBlock->xBlockSize;
+#endif
+
+#if CFG_MEM_DEBUG
+	INIT_LIST_HEAD(&xUsed);
 #endif
 
 	/* Work out the position of the top bit in a size_t variable. */

@@ -362,6 +362,10 @@ typedef struct tskTaskControlBlock
 	#if( INCLUDE_xTaskAbortDelay == 1 )
 		uint8_t ucDelayAborted;
 	#endif
+	
+	#if( CFG_TASK_WDG_ENABLED == 1 )
+		uint16_t ulStackSize;
+	#endif	
 
 } tskTCB;
 
@@ -758,6 +762,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
 			prvAddNewTaskToReadyList( pxNewTCB );
 			xReturn = pdPASS;
+			#if( CFG_TASK_WDG_ENABLED == 1 )	
+				pxNewTCB->ulStackSize = usStackDepth * sizeof( StackType_t );
+			#endif
 		}
 		else
 		{
@@ -4857,5 +4864,42 @@ BaseType_t xTaskIsTaskFinished( xTaskHandle xTask )
 	
     return pdTRUE;
 }
-// eof
 
+#include "tasks.h"  
+#include "task_debug.h"
+
+void vTaskDumpThreadListStack(List_t *list)
+{
+	TCB_t *tcb = NULL;
+
+	if (!list)
+		return;
+
+	if (list->uxNumberOfItems <= 0)
+		return;
+
+	configLIST_VOLATILE ListItem_t *item = list->xListEnd.pxNext;
+
+	while (item != (void*) & list->xListEnd) {
+		tcb = item->pvOwner;
+		rtos_dump_task_backtrace((void*)&tcb);
+		item = item->pxNext;
+	}
+}
+
+BaseType_t xTaskGetStackInfo(xTaskHandle xTask, uint32_t *stack_top,
+					uint32_t *stack_bottom, uint32_t *stack_size)
+{
+	TCB_t *t = (TCB_t*)xTask;
+
+	if (!t) {
+		return pdFALSE;
+	}
+
+	*stack_top = (uint32_t)t->pxTopOfStack;
+	*stack_bottom = (uint32_t)t->pxStack + t->ulStackSize;
+	*stack_size = (uint32_t)t->ulStackSize;
+	return pdTRUE;
+}
+
+// eof

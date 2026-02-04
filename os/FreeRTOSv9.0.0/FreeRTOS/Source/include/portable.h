@@ -171,7 +171,7 @@ void vPortDefineHeapRegions( const HeapRegion_t * const pxHeapRegions ) PRIVILEG
  */
 void *pvPortCalloc( size_t nmemb, size_t size ) PRIVILEGED_FUNCTION;
 void *pvPortRealloc( void *pv, size_t size ) PRIVILEGED_FUNCTION;
-#if OSMALLOC_STATISTICAL
+#if OSMALLOC_STATISTICAL || CFG_MEM_DEBUG
 void *pvPortMalloc_cm(const char *call_func_name, int line, size_t xWantedSize, int need_zero) PRIVILEGED_FUNCTION;
 void *vPortFree_cm(const char *call_func_name, int line, void *pv ) PRIVILEGED_FUNCTION;
 #define pvPortMalloc(size)    pvPortMalloc_cm((const char*)__FUNCTION__,__LINE__,size, 1)
@@ -184,6 +184,7 @@ void vPortFree( void *pv ) PRIVILEGED_FUNCTION;
 void vPortInitialiseBlocks( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetFreeHeapSize( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetMinimumEverFreeHeapSize( void ) PRIVILEGED_FUNCTION;
+size_t prvHeapGetTotalSize(void);
 
 /*
  * Setup the hardware ready for the scheduler to take control.  This generally

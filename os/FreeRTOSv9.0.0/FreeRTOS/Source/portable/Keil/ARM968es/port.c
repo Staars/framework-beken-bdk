@@ -116,8 +116,8 @@ from an asm wrapper function. */
 void vApplicationIdleHook( void )
 {
 #if (CFG_TASK_WDG_ENABLED)
-        extern void task_watchdog_feed(void);
-        task_watchdog_feed();
+        extern void bk_task_wdt_feed(void);
+        bk_task_wdt_feed();
 #endif
 }
 
@@ -200,7 +200,7 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 extern void vPortStartFirstTask( void );
 BaseType_t xPortStartScheduler( void )
 {
-	os_printf("OSK Rev: %s\r\n", BEKEN_OSK_REV);
+	os_printf("OSK Rev: %s %s\r\n", BEKEN_OSK_REV, OSK_COMMIT_ID);
 
 	/* Start the timer that generates the tick ISR.  
 	   Interrupts are disabled here already. */

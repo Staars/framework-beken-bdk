@@ -1235,6 +1235,39 @@ Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 }
 /*-----------------------------------------------------------*/
 
+void* xQueuePickNext( QueueHandle_t xQueue, void *const pvCur )
+{
+	Queue_t * const pxQueue = ( Queue_t * ) xQueue;
+	void *pvNext = NULL;
+
+	taskENTER_CRITICAL();
+	const UBaseType_t uxMessagesWaiting = pxQueue->uxMessagesWaiting;
+
+	if( uxMessagesWaiting > ( UBaseType_t ) 0 ) {
+		const UBaseType_t uxItemSize = pxQueue->uxItemSize;
+
+		if( uxItemSize != ( UBaseType_t ) 0 ) {
+			int8_t *pcRead = (int8_t*)pvCur;
+			int8_t *pcWrite = pxQueue->pcWriteTo;
+
+			if (!pcRead)
+				pcRead = pxQueue->u.pcReadFrom;
+			pcRead += uxItemSize;
+
+			if( pcRead >= pxQueue->pcTail )
+				pcRead = pxQueue->pcHead;
+
+			if (pcRead != pcWrite) {
+				pvNext = (void*)pcRead;
+			}
+		}
+	}
+	taskEXIT_CRITICAL();
+
+	return pvNext;
+}
+
+
 BaseType_t xQueueGenericReceive( QueueHandle_t xQueue, void * const pvBuffer, TickType_t xTicksToWait, const BaseType_t xJustPeeking )
 {
 BaseType_t xEntryTimeSet = pdFALSE;

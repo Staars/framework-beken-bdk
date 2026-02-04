@@ -88,6 +88,18 @@ extern "C" {
  * MACROS AND DEFINITIONS
  *----------------------------------------------------------*/
 
+#define configTIMER_STATE 1
+#define configTIMER_DEBUG 0
+
+#if ( configTIMER_STATE == 1 )
+enum {
+    TIMER_STATE_INIT = 0,
+    TIMER_STATE_RUNNING,
+    TIMER_STATE_STOPPED,
+};
+
+#endif
+
 /* IDs for commands that can be sent/received on the timer queue.  These are to
 be used solely through the macros that make up the public software timer API,
 as defined below.  The commands that are sent from interrupts must use the
@@ -96,18 +108,28 @@ or interrupt version of the queue send function should be used. */
 #define tmrCOMMAND_EXECUTE_CALLBACK_FROM_ISR 	( ( BaseType_t ) -2 )
 #define tmrCOMMAND_EXECUTE_CALLBACK				( ( BaseType_t ) -1 )
 #define tmrCOMMAND_START_DONT_TRACE				( ( BaseType_t ) 0 )
-#define tmrCOMMAND_START					    ( ( BaseType_t ) 1 )
-#define tmrCOMMAND_RESET						( ( BaseType_t ) 2 )
-#define tmrCOMMAND_STOP							( ( BaseType_t ) 3 )
+#define tmrCOMMAND_START					( ( BaseType_t ) 1 )
+#define tmrCOMMAND_RESET					( ( BaseType_t ) 2 )
+#define tmrCOMMAND_STOP						( ( BaseType_t ) 3 )
 #define tmrCOMMAND_CHANGE_PERIOD				( ( BaseType_t ) 4 )
-#define tmrCOMMAND_DELETE						( ( BaseType_t ) 5 )
+#define tmrCOMMAND_DELETE					( ( BaseType_t ) 5 )
 
+#if ( configTIMER_STATE == 0 )
 #define tmrFIRST_FROM_ISR_COMMAND				( ( BaseType_t ) 6 )
 #define tmrCOMMAND_START_FROM_ISR				( ( BaseType_t ) 6 )
 #define tmrCOMMAND_RESET_FROM_ISR				( ( BaseType_t ) 7 )
 #define tmrCOMMAND_STOP_FROM_ISR				( ( BaseType_t ) 8 )
-#define tmrCOMMAND_CHANGE_PERIOD_FROM_ISR		( ( BaseType_t ) 9 )
+#define tmrCOMMAND_CHANGE_PERIOD_FROM_ISR			( ( BaseType_t ) 9 )
+#else
 
+#define tmrCOMMAND_SKIP						( ( BaseType_t ) 6 )
+
+#define tmrFIRST_FROM_ISR_COMMAND				( ( BaseType_t ) 10 )
+#define tmrCOMMAND_START_FROM_ISR				( ( BaseType_t ) tmrFIRST_FROM_ISR_COMMAND )
+#define tmrCOMMAND_RESET_FROM_ISR				( ( BaseType_t ) tmrFIRST_FROM_ISR_COMMAND + 1 )
+#define tmrCOMMAND_STOP_FROM_ISR				( ( BaseType_t ) tmrFIRST_FROM_ISR_COMMAND + 2 )
+#define tmrCOMMAND_CHANGE_PERIOD_FROM_ISR			( ( BaseType_t ) tmrFIRST_FROM_ISR_COMMAND + 3 )
+#endif
 
 /**
  * Type by which software timers are referenced.  For example, a call to
@@ -1308,6 +1330,8 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
 TickType_t xTimerGetExpiryTime( TimerHandle_t xTimer );
 uint32_t xTimerGetNextExpireTime(void);
 uint32_t xTimerGetCurrentTimerCount(void);
+
+bool xTimerInTimerTask(void);
 
 
 #ifdef __cplusplus

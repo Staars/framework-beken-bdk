@@ -2768,7 +2768,7 @@ void vTaskSwitchContext( void )
 	GLOBAL_INT_DECLARATION();
 
 	GLOBAL_INT_DISABLE();
-	if(preempt_delayed_schedule_handler())
+	if(preempt_delayed_schedule_check())
 	{
 		GLOBAL_INT_RESTORE();
 		return;

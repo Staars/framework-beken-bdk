@@ -118,6 +118,9 @@ typedef struct tmrTimerControl
 	#if( ( configSUPPORT_STATIC_ALLOCATION == 1 ) && ( configSUPPORT_DYNAMIC_ALLOCATION == 1 ) )
 		uint8_t 			ucStaticallyAllocated; /*<< Set to pdTRUE if the timer was created statically so no attempt is made to free the memory again if the timer is later deleted. */
 	#endif
+	#if( configTIMER_STATE == 1 )
+		uint8_t state;
+	#endif
 } xTIMER;
 
 /* The old xTIMER name is maintained above then typedefed to the new Timer_t
@@ -408,6 +411,10 @@ static void prvInitialiseNewTimer(	const char * const pcTimerName,
 		pxNewTimer->uxAutoReload = uxAutoReload;
 		pxNewTimer->pvTimerID = pvTimerID;
 		pxNewTimer->pxCallbackFunction = pxCallbackFunction;
+
+#if ( configTIMER_STATE == 1 )
+		pxNewTimer->state = TIMER_STATE_INIT;
+#endif
 		vListInitialiseItem( &( pxNewTimer->xTimerListItem ) );
 		traceTIMER_CREATE( pxNewTimer );
 	}
@@ -418,6 +425,10 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
 {
 BaseType_t xReturn = pdFAIL;
 DaemonTaskMessage_t xMessage;
+
+#if ( configTIMER_DEBUG == 1 )
+	bk_printf("tx timer=%p cmd=%d wait=%x\n", xTimer, xCommandID, xTicksToWait);
+#endif
 
 	configASSERT( xTimer );
 
@@ -494,6 +505,48 @@ Timer_t *pxTimer = ( Timer_t * ) xTimer;
 	return pxTimer->pcTimerName;
 }
 /*-----------------------------------------------------------*/
+#if ( configTIMER_STATE == 1 )
+
+bool xTimerInTimerTask(void)
+{
+	return (xTimerTaskHandle == xTaskGetCurrentTaskHandle());
+}
+
+static bool prvTimerIsRunning(Timer_t *pxTimer)
+{
+	return !!( pxTimer->state == TIMER_STATE_RUNNING );
+}
+
+static bool prvTimerIsStopped(Timer_t *pxTimer)
+{
+	return !!( pxTimer->state == TIMER_STATE_STOPPED );
+}
+
+static void prvTimerSetState( Timer_t *pxTimer, uint8_t state )
+{
+	pxTimer->state = state;
+}
+
+void prvClearQueuedMsg( Timer_t *pxTimer )
+{
+	DaemonTaskMessage_t *pxMsg;
+	Timer_t *pxCurTimer;
+
+	pxMsg = xQueuePickNext(xTimerQueue, NULL);
+	while (pxMsg) {
+		if (pxMsg->xMessageID >= 0) {
+			pxCurTimer = pxMsg->u.xTimerParameters.pxTimer;
+			if (pxCurTimer == pxTimer) {
+				os_printf("change timer=%p state=%d message %d to skipped\n",
+					pxCurTimer, pxCurTimer->state, pxMsg->xMessageID);
+				pxMsg->xMessageID = tmrCOMMAND_SKIP;
+			}
+		}
+		pxMsg = xQueuePickNext(xTimerQueue, pxMsg);
+	}
+}
+
+#endif
 
 static void prvProcessExpiredTimer( const TickType_t xNextExpireTime, const TickType_t xTimeNow )
 {
@@ -530,8 +583,16 @@ Timer_t * const pxTimer = ( Timer_t * ) listGET_OWNER_OF_HEAD_ENTRY( pxCurrentTi
 		mtCOVERAGE_TEST_MARKER();
 	}
 
+#if ( configTIMER_STATE == 1 )
+	if (prvTimerIsRunning(pxTimer)) {
+		pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
+	} else {
+		bk_printf("skip timer=%p cb since it's stopped!\n", pxTimer);
+	}
+#else
 	/* Call the timer callback. */
 	pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
+#endif
 }
 /*-----------------------------------------------------------*/
 
@@ -789,6 +850,10 @@ TickType_t xTimeNow;
 			software timer. */
 			pxTimer = xMessage.u.xTimerParameters.pxTimer;
 
+			#if ( configTIMER_DEBUG == 1 )
+				bk_printf("rx timer=%p cmd=%d, period=%d begin\n", pxTimer, xMessage.xMessageID, pxTimer->xTimerPeriodInTicks);
+			#endif
+
 			if( listIS_CONTAINED_WITHIN( NULL, &( pxTimer->xTimerListItem ) ) == pdFALSE )
 			{
 				/* The timer is in a list, remove it. */
@@ -816,12 +881,20 @@ TickType_t xTimeNow;
 			    case tmrCOMMAND_RESET :
 			    case tmrCOMMAND_RESET_FROM_ISR :
 				case tmrCOMMAND_START_DONT_TRACE :
+					#if ( configTIMER_STATE == 1 )
+						if ( ( xMessage.xMessageID == tmrCOMMAND_START_DONT_TRACE ) && ( prvTimerIsStopped(pxTimer) ) ) {
+							bk_printf("skip timer=%p don't trace cmd since it's stopped!\n", pxTimer);
+							break;
+						}
+
+						prvTimerSetState(pxTimer, TIMER_STATE_RUNNING);
+					#endif
+
 					/* Start or restart a timer. */
 					if( prvInsertTimerInActiveList( pxTimer,  xMessage.u.xTimerParameters.xMessageValue + pxTimer->xTimerPeriodInTicks, xTimeNow, xMessage.u.xTimerParameters.xMessageValue ) != pdFALSE )
 					{
 						/* The timer expired before it was added to the active
 						timer list.  Process it now. */
-						
 						pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
 						traceTIMER_EXPIRED( pxTimer );
 
@@ -844,6 +917,10 @@ TickType_t xTimeNow;
 
 				case tmrCOMMAND_STOP :
 				case tmrCOMMAND_STOP_FROM_ISR :
+					#if ( configTIMER_STATE == 1 )
+						prvTimerSetState(pxTimer, TIMER_STATE_STOPPED);
+					#endif
+
 					/* The timer has already been removed from the active list.
 					There is nothing to do here. */
 					break;
@@ -852,6 +929,16 @@ TickType_t xTimeNow;
 				case tmrCOMMAND_CHANGE_PERIOD_FROM_ISR :
 					pxTimer->xTimerPeriodInTicks = xMessage.u.xTimerParameters.xMessageValue;
 					configASSERT( ( pxTimer->xTimerPeriodInTicks > 0 ) );
+
+					#if ( configTIMER_STATE == 1 )
+					/* If the timer is already stopped, CHANGE_PERIOD command only changes the period
+					but not place it into the active list, namely not start the timer, the application
+					needs to start timer explicitly */
+					if (prvTimerIsStopped(pxTimer)) {
+						bk_printf("only change period of timer=%p but not stop since it's stopped\n");
+						break;
+					}
+					#endif
 
 					/* The new period does not really have a reference, and can
 					be longer or shorter than the old one.  The command time is
@@ -863,6 +950,14 @@ TickType_t xTimeNow;
 					break;
 
 				case tmrCOMMAND_DELETE :
+					#if ( configTIMER_STATE == 1 )
+					{
+						prvClearQueuedMsg(pxTimer);
+						//Trigger beneken timer to set the state to BEKEN_TIMER_DELETED
+						pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
+					}
+					#endif
+
 					/* The timer has already been removed from the active list,
 					just free up the memory if the memory was dynamically
 					allocated. */
@@ -888,6 +983,12 @@ TickType_t xTimeNow;
 					}
 					#endif /* configSUPPORT_DYNAMIC_ALLOCATION */
 					break;
+
+				#if ( configTIMER_STATE == 1 )
+				case tmrCOMMAND_SKIP:
+					bk_printf("skip timer=%p\n", pxTimer);
+					break;
+				#endif
 
 				default	:
 					/* Don't expect to get here. */
@@ -1007,7 +1108,13 @@ static void prvCheckForValidListAndQueue( void )
 	taskEXIT_CRITICAL();
 }
 /*-----------------------------------------------------------*/
+#if ( configTIMER_STATE == 1 )
+BaseType_t xTimerIsTimerActive( TimerHandle_t xTimer )
+{
+	return prvTimerIsRunning(( Timer_t * )xTimer);
+}
 
+#else
 BaseType_t xTimerIsTimerActive( TimerHandle_t xTimer )
 {
 BaseType_t xTimerIsInActiveList;
@@ -1027,6 +1134,8 @@ Timer_t *pxTimer = ( Timer_t * ) xTimer;
 
 	return xTimerIsInActiveList;
 } /*lint !e818 Can't be pointer to const due to the typedef. */
+#endif
+
 /*-----------------------------------------------------------*/
 
 void *pvTimerGetTimerID( const TimerHandle_t xTimer )

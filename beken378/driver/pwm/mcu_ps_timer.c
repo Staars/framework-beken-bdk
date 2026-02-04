@@ -195,7 +195,8 @@ UINT32 ps_timer3_disable(void)
         while(REG_READ(TIMER3_5_READ_CTL) & TIMER3_5_READ_OP_BIT);
         less = REG_READ(TIMER3_5_READ_VALUE);
 #else
-        less = REG_READ(TIMER3_CNT);
+        /*timer value can not read*/
+        less = 0;
 #endif
     }
 

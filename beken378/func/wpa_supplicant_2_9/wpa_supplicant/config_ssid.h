@@ -11,7 +11,7 @@
 
 #include "common/defs.h"
 #include "utils/list.h"
-
+#include "eap_peer/eap_config.h"
 
 #define DEFAULT_EAP_WORKAROUND ((unsigned int) -1)
 #define DEFAULT_EAPOL_FLAGS (EAPOL_FLAG_REQUIRE_KEY_UNICAST | \
@@ -503,6 +503,7 @@ struct wpa_ssid {
 	int acs;
 #endif /* CONFIG_ACS */
 
+#ifdef CONFIG_MESH
 	/**
 	 * mesh_basic_rates - BSS Basic rate set for mesh network
 	 *
@@ -516,6 +517,7 @@ struct wpa_ssid {
 	int dot11MeshRetryTimeout; /* msec */
 	int dot11MeshConfirmTimeout; /* msec */
 	int dot11MeshHoldingTimeout; /* msec */
+#endif
 
 	int ht;
 	int ht40;

@@ -4,8 +4,9 @@
 #include "rwnx.h"
 #include "rw_msdu.h"
 #include "mem_pub.h"
+#include "rwnx_defs.h"
 
-typedef struct _wifi_cn_code_st_ 
+typedef struct _wifi_cn_code_st_
 {
     UINT32 init;
     wifi_country_t cfg;
@@ -82,6 +83,7 @@ static struct ieee80211_channel rw_5ghz_a_channels[] =
 #endif
 
 WIPHY_T g_wiphy;
+struct rwnx_hw g_rwnx_hw;
 UINT8 beacon[149] =
 {
     128, 0, 0, 0, 255, 255, 255, 255, 255, 255, 18, 113, 17, 113, 11, 113,
@@ -98,9 +100,13 @@ UINT8 beacon[149] =
 
 UINT32 rw_ieee80211_init(void)
 {
+	struct rwnx_hw *rwnx_hw;
     RW_CONNECTOR_T intf;
     struct ieee80211_sta_ht_cap ht_cap = RWNX_HT_CAPABILITIES;
     struct ieee80211_sta_vht_cap vht_cap = RWNX_VHT_CAPABILITIES;
+
+	rwnx_hw = &g_rwnx_hw;
+	memset(rwnx_hw, 0, sizeof(*rwnx_hw));
 
     g_wiphy.bands[IEEE80211_BAND_2GHZ].num_channels = sizeof(rw_2ghz_channels) /
             sizeof(rw_2ghz_channels[0]);
@@ -142,29 +148,37 @@ UINT32 rw_ieee80211_init(void)
     return 0;
 }
 
+void rwnx_hw_reinit(void)
+{
+	struct rwnx_hw *rwnx_hw;
+
+	rwnx_hw = &g_rwnx_hw;
+	memset(rwnx_hw, 0, sizeof(*rwnx_hw));
+}
+
 UINT32 rw_ieee80211_set_country(const wifi_country_t *country)
 {
-    if(country) 
+    if(country)
     {
         UINT32 prev_policy;
-        
+
         if(g_country_code.init == 0)
             return kNotInitializedErr;
 
         prev_policy = g_country_code.cfg.policy;
-        
+
         os_memcpy(&g_country_code.cfg, country, sizeof(wifi_country_t));
         os_printf("rw_ieee80211_set_country code:\r\n");
         os_printf("code: %s\r\n", g_country_code.cfg.cc);
         os_printf("channel: %d - %d\r\n", g_country_code.cfg.schan,
             g_country_code.cfg.schan + g_country_code.cfg.nchan - 1);
-        
-        if(g_country_code.cfg.policy == WIFI_COUNTRY_POLICY_MANUAL) 
+
+        if(g_country_code.cfg.policy == WIFI_COUNTRY_POLICY_MANUAL)
             os_printf("mode: MANUAL\r\n", g_country_code.cfg.policy );
         else
         {
             os_printf("mode: AUTO\r\n", g_country_code.cfg.policy );
-            if(prev_policy != g_country_code.cfg.policy) 
+            if(prev_policy != g_country_code.cfg.policy)
             {
                 os_printf("in auto mode, need change softap beacon\r\n");
                 // to do
@@ -173,7 +187,7 @@ UINT32 rw_ieee80211_set_country(const wifi_country_t *country)
 
         return kNoErr;
     }
-    else 
+    else
     {
         return kParamErr;
     }
@@ -181,16 +195,16 @@ UINT32 rw_ieee80211_set_country(const wifi_country_t *country)
 
 UINT32 rw_ieee80211_get_country(wifi_country_t *country)
 {
-    if(country) 
+    if(country)
     {
         if(g_country_code.init == 0)
             return kNotInitializedErr;
-        
+
         os_memcpy(country, &g_country_code.cfg, sizeof(wifi_country_t));
 
         return kNoErr;
     }
-    else 
+    else
     {
         return kParamErr;
     }
@@ -265,7 +279,7 @@ UINT8 rw_ieee80211_init_scan_chan(struct scanu_start_req *req)
         // auto mode, sta need scan all channel
         num_chan = g_wiphy.bands[IEEE80211_BAND_2GHZ].num_channels;
     }
-    
+
     for(i = 0; i < num_chan; i ++)
     {
         req->chan[i].band = IEEE80211_BAND_2GHZ;
@@ -305,7 +319,7 @@ UINT8 rw_ieee80211_is_scan_rst_in_countrycode(UINT8 freq)
 
     start_chan = g_country_code.cfg.schan;
     end_chan = (start_chan + g_country_code.cfg.nchan - 1);
-    
+
     if((freq < start_chan) || (freq > end_chan))
         return 0;
 

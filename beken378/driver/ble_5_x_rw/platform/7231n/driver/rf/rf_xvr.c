@@ -47,6 +47,9 @@
 #include "ble_reg_access.h"			//// added
 #include "BK3633_RegList.h"           // Platform register
 #include "user_config.h"
+#include "sys_ctrl_pub.h"
+#include "drv_model_pub.h"
+
 /**
  ****************************************************************************************
  * DEFINES
@@ -279,12 +282,17 @@ static void rf_em_init(void)
 
 void xvr_reg_init(void)
 {
+	uint32_t reg;
+
 	// TODO:Use hardware powertable
 #if 0
 	*((volatile unsigned long *)(0x01050200)) = 0x200;
 	unsigned long temp = *((volatile unsigned long *)(0x01050200));
 	bk_printf("temp:%08x\r\n", temp);
 #endif
+
+	reg = RF_HOLD_BY_BLE_BIT;
+	sddev_control(SCTRL_DEV_NAME, CMD_RF_HOLD_BIT_SET, &reg);
 
 #if 1
 	REG_WRITE(BLE_XVR_REG00, 0x0426684E);
@@ -401,6 +409,7 @@ void xvr_reg_init(void)
 	REG_WRITE(BLE_XVR_REG4F, 0x12001170);
 #endif
 #endif
+	sddev_control(SCTRL_DEV_NAME, CMD_RF_HOLD_BIT_CLR, &reg);
 }
 
 #if defined(CFG_BLE)
@@ -491,7 +500,11 @@ void rf_init(struct rwip_rf_api *api)
 						   /*uint8_t rxpwrup0*/ 	 0x50,
 						   /*uint8_t txpwrdn0*/ 	 0x07,
 						   /*uint8_t txpwrup0*/ 	 0x55);
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiopwrupdn0_set(0x00650050);
+	#else
 	ble_radiopwrupdn0_set(0x00650065);
+	#endif
 	//uart_printf("BLE_RADIOPWRUPDN0 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOPWRUPDN0_ADDR,ble_radiopwrupdn0_get());
 
 	/* BLE RADIOPWRUPDN1 */
@@ -499,7 +512,11 @@ void rf_init(struct rwip_rf_api *api)
 						   /*uint8_t rxpwrup1*/ 	 0x70,
 						   /*uint8_t txpwrdn0*/ 	 0x00,
 						   /*uint8_t txpwrup1*/ 	 0x65);
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiopwrupdn1_set(0x00650050);
+	#else
 	ble_radiopwrupdn1_set(0x00650065);
+	#endif
 	// uart_printf("BLE_RADIOPWRUPDN1 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOPWRUPDN1_ADDR,ble_radiopwrupdn1_get());
 
 	/* BLE RADIOPWRUPDN2 */      
@@ -507,28 +524,36 @@ void rf_init(struct rwip_rf_api *api)
 						   /*uint8_t rxpwrup2*/ 	 0x50, // 50
 						   /*uint8_t txpwrdn2*/ 	 0x07,
 						   /*uint8_t txpwrup2*/ 	 0x55);
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiopwrupdn2_set(0x00650050);
+	#else
 	ble_radiopwrupdn2_set(0x00650065);
+	#endif
 	//uart_printf("BLE_RADIOPWRUPDN2 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOPWRUPDN2_ADDR,ble_radiopwrupdn2_get());
 
 
 	/* BLE RADIOPWRUPDN3 */
 	ble_radiopwrupdn3_pack(/*uint8_t txpwrdn3*/ 	 0x07,
 						   /*uint8_t txpwrup3*/ 	 0x55);
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiopwrupdn3_set(0x00000050);
+	#else
 	ble_radiopwrupdn3_set(0x00000065);
+	#endif
 	//uart_printf("BLE_RADIOPWRUPDN3 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOPWRUPDN3_ADDR,ble_radiopwrupdn3_get());
 
 	/* BLE RADIOTXRXTIM0 */
 	ble_radiotxrxtim0_pack(/*uint8_t rfrxtmda0*/   0,
 						   /*uint8_t rxpathdly0*/  0x6,
 						   /*uint8_t txpathdly0*/  0x6);
-	ble_radiotxrxtim0_set(0x00000606);  //0x00001007
+	ble_radiotxrxtim0_set(0x0000020A);  //0x00001007
 	//uart_printf("BLE_RADIOTXRXTIM0 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOTXRXTIM0_ADDR,ble_radiotxrxtim0_get());
 
 	/* BLE RADIOTXRXTIM1 */
 	ble_radiotxrxtim1_pack(/*uint8_t rfrxtmda1*/ 0x00,
 						   /*uint8_t rxpathdly1*/	   0x04,
 						   /*uint8_t txpathdly1*/	   0x04);
-	ble_radiotxrxtim1_set(0x00050C04);
+	ble_radiotxrxtim1_set(0x00050808);
 	//uart_printf("BLE_RADIOTXRXTIM1 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOTXRXTIM1_ADDR,ble_radiotxrxtim1_get());
 
 
@@ -538,14 +563,22 @@ void rf_init(struct rwip_rf_api *api)
 						   /*uint8_t rfrxtmda2*/	   0x00,
 						   /*uint8_t rxpathdly2*/	   0x49,
 						   /*uint8_t txpathdly2*/	   0x03);
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiotxrxtim2_set(0x3500200B); //0x35002020
+	#else
 	ble_radiotxrxtim2_set(0x00002020);
+	#endif
 	//uart_printf("BLE_RADIOTXRXTIM2 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOTXRXTIM2_ADDR,ble_radiotxrxtim2_get());
 
 	/* BLE RADIOTXRXTIM3 */
 	ble_radiotxrxtim3_pack(/*uint8_t rxflushpathdly3*/ 0x10,
 						   /*uint8_t rfrxtmda3*/	   0x00,
 						   /*uint8_t txpathdly3*/	   0x03);
-	ble_radiotxrxtim3_set(0x00000020);                       
+	#if (BLE_PHY_CODED_SUPPORT)
+	ble_radiotxrxtim3_set(0x0C00000B);
+	#else
+	ble_radiotxrxtim3_set(0x00000020);
+	#endif
 	//uart_printf("BLE_RADIOTXRXTIM3 addr:0x%08x,val:0x%08x\r\n",BLE_RADIOTXRXTIM3_ADDR,ble_radiotxrxtim3_get());
 
 #if (BLE_CON_CTE_REQ | BLE_CONLESS_CTE_RX)

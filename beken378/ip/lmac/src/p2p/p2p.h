@@ -349,7 +349,7 @@ extern struct p2p_info_tag p2p_info_tab[NX_P2P_VIF_MAX];
  * INVALID_VIF_IDX in order to inform that the structure is available.
  ****************************************************************************************
  */
-void p2p_init(void);
+void p2p_initialize(void);
 
 
 /**

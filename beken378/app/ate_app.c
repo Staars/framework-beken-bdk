@@ -1,13 +1,16 @@
-#include "ate_app.h"
-#if ATE_APP_FUN
-
 #include "include.h"
+#include "ate_app.h"
 
-#if (CFG_OS_FREERTOS)
+#if ATE_APP_FUN
+#if (!CFG_SUPPORT_ALIOS) 
 #include "app.h"
+#endif
+
+#include "uart_pub.h"
 #include "wlan_cli_pub.h"
 #include "sys_ctrl_pub.h"
-#endif
+#include "mem_pub.h"
+#include "str_pub.h"
 
 char ate_mode_state = 0;
 int ate_gpio_port = GPIO0;
@@ -17,6 +20,11 @@ int ate_gpio_port = GPIO0;
 void ate_gpio_init(void)
 {
     uint32_t param;
+
+    if (UART1_PORT == uart_print_port)
+    {
+        ate_gpio_port = GPIO11;
+    }
 
     param = GPIO_CFG_PARAM(ate_gpio_port, GMODE_INPUT_PULLUP);
     gpio_ctrl( CMD_GPIO_CFG, &param);
@@ -51,14 +59,10 @@ void ate_app_init(void)
 
 uint32_t get_ate_mode_state(void)
 {
-    //ATE_PRT("ateflag:%d\r\n", ate_mode_state);
     if(ate_mode_state != (char)0)
         return 1;
     return 0;
 }
-
-#include "mem_pub.h"
-#include "str_pub.h"
 
 #ifdef SINGLE_WAVE_TEST
 static void do_single_wave_test(void)
@@ -75,20 +79,18 @@ static void do_single_wave_test(void)
 }
 #endif
 
-#if (CFG_OS_FREERTOS)
 void ate_start(void)
 {
     app_pre_start();
 
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_LITEOS)
     cli_init();
+#endif
 
     sctrl_rf_ps_enable_clear();
 
     ATE_PRT("ate_start\r\n");
-
-    //do_single_wave_test();
 }
-#endif
 
 #endif /*ATE_APP_FUN */
 // eof

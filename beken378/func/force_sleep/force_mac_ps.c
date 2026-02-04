@@ -167,7 +167,14 @@ static void force_mac_ps_set_mac_to_idle(uint32_t *mac_status)
 					i_tmp = 0;
 					y_tmp ++;
 					if (y_tmp > 50) {
-						FS_WARN("[mac] goto idle timeout\r\n");
+						FS_FATAL("[mac] goto idle timeout\r\n");
+
+						#if CONFIG_RECOVER_FORCE_IDLE_ISSUE
+						/*TODO: root reason need be explored.if not reset mac fsm 
+						 * system will hang / dead while here;
+						 */
+						nxmac_hw_fsm_reset_setf(1);
+						#endif
 						y_tmp = 0;
 					}
 					nxmac_next_state_setf(HW_IDLE);
@@ -197,11 +204,11 @@ int force_mac_ps_entry(uint32_t *mac_status, uint32_t *mac_timer_enbit)
 
 	if(!(rwnxl_get_status_in_doze()))
 	{
-	// go to IDLE
-	force_mac_ps_set_mac_to_idle(mac_status);
+		// go to IDLE
+		force_mac_ps_set_mac_to_idle(mac_status);
 
-	// Ask HW to go to DOZE
-	nxmac_next_state_setf(HW_DOZE);
+		// Ask HW to go to DOZE
+		nxmac_next_state_setf(HW_DOZE);
 	}
 
 	// sleep mac

@@ -52,6 +52,9 @@
 #include "lwip/sys.h"
 #include <lwip/stats.h>
 #include <lwip/snmp.h>
+#if LWIP_IPV6
+#include "lwip/ethip6.h"
+#endif
 #include "ethernetif.h"
 
 #include <stdio.h>
@@ -159,7 +162,6 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
 	err_t err = ERR_OK;
     uint8_t vif_idx = rwm_mgmt_get_netif2vif(netif);
 
-	//os_printf("output:%x\r\n", p);
 	ret = bmsg_tx_sender(p, (uint32_t)vif_idx);
 	if(0 != ret)
 	{
@@ -204,6 +206,9 @@ ethernetif_input(int iface, struct pbuf *p)
     {
         /* IP or ARP packet? */
     case ETHTYPE_IP:
+    #if LWIP_IPV6
+    case ETHTYPE_IPV6:
+    #endif
     case ETHTYPE_ARP:
 #if PPPOE_SUPPORT
         /* PPPoE packet? */
@@ -265,6 +270,9 @@ ethernetif_init(struct netif *netif)
      * is available...) */
     netif->output = etharp_output;
     netif->linkoutput = low_level_output;
+    #if LWIP_IPV6
+    netif->output_ip6 = ethip6_output;
+    #endif
 
     /* initialize the hardware */
     low_level_init(netif);
@@ -303,7 +311,7 @@ err_t lwip_netif_init(struct netif *netif)
 	 * is available...) */
 	netif->output = etharp_output;
 	netif->linkoutput = low_level_output;
-#ifdef CONFIG_IPV6
+#if LWIP_IPV6
 	netif->output_ip6 = ethip6_output;
 #endif
 

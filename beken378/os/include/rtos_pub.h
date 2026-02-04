@@ -5,10 +5,16 @@
 #include "typedef.h"
 #include "error.h"
 
+#if CFG_SUPPORT_LITEOS
+#include "los_compiler.h"
+#endif
+
 #pragma once
 
 #define RTOS_SUCCESS                       (1)
 #define RTOS_FAILURE                       (0)
+
+#define LOS_PRIORITY_WIN                   8
 
 #define BEKEN_DEFAULT_WORKER_PRIORITY      (6)
 #define BEKEN_APPLICATION_PRIORITY         (7)
@@ -29,18 +35,26 @@
 #define HOURS                              (60 * MINUTES)
 #define DAYS                               (24 * HOURS)
 
-#if FreeRTOS_VERSION_MAJOR == 7
-#define _xTaskCreate( pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask ) xTaskCreate( pvTaskCode, (signed char*)pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask )
-#define _xTimerCreate( pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction ) xTimerCreate( (signed char*)pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction )
-#else
-#define _xTaskCreate( pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask ) xTaskCreate( pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask )
-#define _xTimerCreate( pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction ) xTimerCreate( pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction )
+/* Suppress unused parameter warning */
+#ifndef UNUSED_PARAMETER
+#define UNUSED_PARAMETER(x) ( (void)(x) )
 #endif
 
-typedef int             OSStatus;
+/* Suppress unused variable warning */
+#ifndef UNUSED_VARIABLE
+#define UNUSED_VARIABLE(x) ( (void)(x) )
+#endif
+
+#if CFG_OS_FREERTOS
+#define _xTaskCreate( pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask ) \
+	xTaskCreate( pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask )
+#define _xTimerCreate( pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction ) \
+	xTimerCreate( pcTimerName, xTimerPeriodInTicks, uxAutoReload, pvTimerID, pxCallbackFunction )
+#endif
+
+typedef int OSStatus;
 typedef void (*timer_handler_t)( void*);
 typedef OSStatus (*event_handler_t)( void* arg);
-
 typedef void *          beken_thread_arg_t;
 typedef uint8_t         beken_bool_t;
 typedef uint32_t        beken_time_t;        /**< Time value in milliseconds */
@@ -109,10 +123,13 @@ void rtos_enter_critical( void);
   */
 void rtos_exit_critical( void);
 
+extern void rtos_lock_scheduling( void );
+extern void rtos_unlock_scheduling( void );
+
 /**
   * @}
   */
-
+uint32_t beken_tick_ms(void);
 OSStatus beken_time_get_time(beken_time_t* time_ptr);
 OSStatus beken_time_set_time(beken_time_t* time_ptr);
 
@@ -274,6 +291,7 @@ beken_thread_t* rtos_get_current_thread( void);
   * @return   None.
   */
 void rtos_thread_sleep(uint32_t seconds);
+void rtos_thread_msleep(uint32_t ms);
 
 /** @brief    Suspend current thread for a specific time
  *
@@ -393,6 +411,7 @@ OSStatus rtos_init_mutex( beken_mutex_t* mutex);
   * @return   kGeneralErr   : if an error occurred
   */
 OSStatus rtos_lock_mutex( beken_mutex_t* mutex);
+OSStatus rtos_trylock_mutex( beken_mutex_t* mutex);
 
 
 /** @brief    Releases the lock on a mutex
@@ -665,7 +684,9 @@ int UnSetTimer(void (*psysTimerHandler)(void));
 uint32_t rtos_get_timer_expiry_time( beken_timer_t* timer);
 uint32_t rtos_get_next_expire_time();
 uint32_t rtos_get_current_timer_count(void);
-
+void *beken_malloc( size_t xWantedSize );
+void beken_free( void *pv );
+void *beken_realloc( void *pv, size_t xWantedSize );
 
 /** @brief    Initialize an endpoint for a RTOS event, a file descriptor
   *           will be created, can be used for select
@@ -684,13 +705,8 @@ int rtos_init_event_fd(beken_event_t event_handle);
   * @retval   0 for success. On error, -1 is returned.
   */
 int rtos_deinit_event_fd(int fd);
-
+uint32_t rtos_get_tick_count(void);
 OSStatus rtos_push_to_queue_front(beken_queue_t* queue, void* message, uint32_t timeout_ms);
-
-/**
-  * @}
-  */
-
 #endif // __RTOS_PUB__
 // EOF
 

@@ -144,10 +144,13 @@ static uint8_t sdp_write_service_ntf_cfg_req(uint8_t conidx,uint16_t handle,uint
 	bk_printf("conidx:%d,handle = 0x%04x,ntf_cfg = 0x%x\r\n",conidx,handle,ntf_cfg);
 #endif
 
-	if((kernel_state_get(KERNEL_BUILD_ID(TASK_BLE_APP,conidx)) != APPC_LINK_IDLE))
+	struct prf_sdp_db_env *sdp_db_env;
+	sdp_db_env = sdp_profiles_sdp_db_env(conhdl, handle);
+	if((kernel_state_get(KERNEL_BUILD_ID(TASK_BLE_APP,BLE_APP_INITING_INDEX(conidx))) != APPC_LINK_IDLE) &&
+		(KERNEL_TYPE_GET(prf_get_task_from_id(KERNEL_BUILD_ID((TASK_BLE_ID_SDP+sdp_db_env->prf_idx),sdp_db_env->prf_idx))) < TASK_BLE_NONE))
 	{
 		struct sdp_write_ntf_cfg_req *req = KERNEL_MSG_ALLOC(SDP_WRITE_NTF_CFG_REQ,
-		                        prf_get_task_from_id(KERNEL_BUILD_ID(TASK_BLE_ID_SDP,conhdl)),
+		                        prf_get_task_from_id(KERNEL_BUILD_ID((TASK_BLE_ID_SDP+sdp_db_env->prf_idx),sdp_db_env->prf_idx)),
 		                        KERNEL_BUILD_ID(TASK_BLE_APP,conidx),
 		                        sdp_write_ntf_cfg_req);
 #if BLE_APP_SDP_DBG_CHECK(BLE_APP_SDP_ALL)
@@ -317,6 +320,8 @@ void sdp_add_profiles(uint8_t conidx,struct prf_sdp_db_env *db_env)
 	sdp_env_init.add_profiles_nums[conidx]++;
 
 	kernel_msg_send(req);
+
+	(void)conhdl;
 }
 
 
@@ -326,9 +331,10 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 	struct prf_sdp_db_env *prf_db_env = NULL;
 	uint8_t free_env_idx;
 	uint16_t malloc_size;
-	uint16_t length;
 
 #if BLE_APP_SDP_DBG_CHECK(BLE_APP_SDP_ALL)
+	uint16_t length;
+
 	bk_printf("[%s]service uuid len = 0x%x,uuid = 0x",__func__,ind->uuid_len);
 	for(int i = 0; i < ind->uuid_len; i++)
 	{
@@ -380,7 +386,7 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 							}
 						}
 					}
-					while(((ind->start_hdl+ 1 + fnd_att) <= ind->end_hdl)
+					while(((ind->start_hdl+ 1 + fnd_att) < ind->end_hdl)
 						&& (ind->info[fnd_att].att_type != GATTC_SDP_ATT_CHAR)
 						&& (ind->info[fnd_att].att_type != GATTC_SDP_INC_SVC));
 					// return to previous valid value
@@ -422,9 +428,15 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 //    bk_printf("total need = 0x%x\r\n",sizeof(struct  prf_char_inf ) * svc_char_cnt + svc_desc_cnt * sizeof( struct prf_char_desc_inf ));
 /*************************alloc memory *******************************/
 //    bk_printf("chars need = 0x%x\r\n",sizeof(struct prf_char_inf) * svc_char_cnt);
-	struct prf_char_inf *chars = (struct prf_char_inf *) kernel_malloc(sizeof(struct prf_char_inf) * svc_char_cnt,KERNEL_MEM_NON_RETENTION);
+	struct prf_char_inf *chars = NULL;
+	if(svc_char_cnt) {
+		chars= (struct prf_char_inf *) kernel_malloc(sizeof(struct prf_char_inf) * svc_char_cnt,KERNEL_MEM_NON_RETENTION);
+	}
 //    bk_printf("descs need = 0x%x\r\n",sizeof(struct prf_char_desc_inf) * svc_desc_cnt);
-	struct prf_char_desc_inf *descs = (struct prf_char_desc_inf *)kernel_malloc(sizeof(struct prf_char_desc_inf) * svc_desc_cnt ,KERNEL_MEM_ATT_DB);
+	struct prf_char_desc_inf *descs = NULL;
+	if(svc_desc_cnt) {
+		descs = (struct prf_char_desc_inf *)kernel_malloc(sizeof(struct prf_char_desc_inf) * svc_desc_cnt ,KERNEL_MEM_ATT_DB);
+	}
 //    bk_printf("chars_inf = 0x%08x,descs_inf = 0x%08x\r\n",chars,descs);
 //    bk_printf("alloc memory END\r\n");
 // add_svc_flag = 0;
@@ -448,7 +460,7 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 		prf_db_env->sdp_cont->descs_nb = 0;
 		for (fnd_att=0; fnd_att< (ind->end_hdl - ind->start_hdl); fnd_att++)
 		{
-			if(ind->info[fnd_att].att_type == GATTC_SDP_ATT_CHAR)
+			if((ind->info[fnd_att].att_type == GATTC_SDP_ATT_CHAR) && chars)
 			{
 				uint16_t char_hdl = ind->start_hdl + 1 + fnd_att;
 				uint16_t val_hdl  = ind->info[fnd_att].att_char.handle;
@@ -502,7 +514,7 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 						{
 							fnd_att++;
 							// found a descriptor
-							if(ind->info[fnd_att].att_type == GATTC_SDP_ATT_DESC)
+							if((ind->info[fnd_att].att_type == GATTC_SDP_ATT_DESC) && descs)
 							{
 								//Retrieve characteristic descriptor handle using UUID
 								for(svc_desc = 0; svc_desc<ind->end_hdl - ind->start_hdl; svc_desc++)
@@ -526,7 +538,7 @@ struct prf_sdp_db_env* sdp_extract_svc_info(uint8_t conhdl,struct gattc_sdp_svc_
 									}
 								}
 							}
-						} while(((ind->start_hdl+ 1 + fnd_att) <= ind->end_hdl)
+						} while(((ind->start_hdl+ 1 + fnd_att) < ind->end_hdl)
 							&& (ind->info[fnd_att].att_type != GATTC_SDP_ATT_CHAR)
 							&& (ind->info[fnd_att].att_type != GATTC_SDP_INC_SVC));
 						// return to previous valid value
@@ -618,10 +630,11 @@ static uint8_t sdp_init (struct prf_task_env* env, uint16_t* start_hdl, uint16_t
 
 	if(0 != prf_db_env->sdp_cont->descs_nb)
 	{
+#if BLE_APP_SDP_DBG_CHECK(BLE_APP_SDP_WARN)
 		uint16_t shdl,ehdl;
 		shdl = sdp_env->prf_db_env->sdp_cont->svc.shdl;
 		ehdl = sdp_env->prf_db_env->sdp_cont->svc.ehdl;
-#if BLE_APP_SDP_DBG_CHECK(BLE_APP_SDP_WARN)
+
 		bk_printf("prf_register_atthdl2gatt start_hdl:%d[0x%02x],end_hdl:%d[0x%02x]\r\n",shdl,shdl,ehdl,ehdl);
 #endif
 		prf_register_atthdl2gatt(&(sdp_env->prf_env),sdp_env->conidx, &sdp_env->prf_db_env->sdp_cont->svc);
@@ -690,7 +703,7 @@ static void sdp_destroy(struct prf_task_env* env)
 static void sdp_create(struct prf_task_env* env, uint8_t conidx)
 {
 	struct sdp_env_tag* sdp_env = (struct sdp_env_tag*)env->env;
-	struct prf_sdp_db_env  *prf_db_env = sdp_env->prf_db_env;
+	///struct prf_sdp_db_env  *prf_db_env = sdp_env->prf_db_env;
 	bk_printf("[sdp_create]env->task:%d,sdp_env->conidx:%d,conhdl:%d,cur_state:%x\r\n",env->task,sdp_env->conidx,conidx,
 		kernel_state_get(KERNEL_BUILD_ID(env->task, 0)));
 
@@ -760,8 +773,9 @@ static void sdp_cleanup(struct prf_task_env* env, uint8_t conidx, uint8_t reason
 	// clean-up environment variable allocated for task instance
 	if(sdp_env->operation != NULL)
 	{
-		struct kernel_msg *msg = kernel_msg2param(sdp_env->operation);
 #if BLE_APP_SDP_DBG_CHECK(BLE_APP_SDP_WARN)
+		struct kernel_msg *msg = kernel_msg2param(sdp_env->operation);
+
 		bk_printf("operation = 0x%08x\r\n",(uint32_t)sdp_env->operation);
 		bk_printf("msgid = 0x%02x,dest_id = 0x%02x,src_id = 0x%02x\r\n",msg->id,msg->dest_id,msg->src_id);
 #endif

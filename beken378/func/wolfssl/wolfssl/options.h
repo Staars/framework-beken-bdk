@@ -15,9 +15,6 @@
 extern "C" {
 #endif
 
-#undef  HAVE_FFDHE_2048
-#define HAVE_FFDHE_2048
-
 #ifndef WOLFSSL_OPTIONS_IGNORE_SYS
 #undef  _POSIX_THREADS
 #define _POSIX_THREADS

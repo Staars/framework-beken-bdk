@@ -97,10 +97,10 @@ typedef struct ip6_addr ip6_addr_t;
                                     (dest).addr[2] = (src).addr[2]; \
                                     (dest).addr[3] = (src).addr[3];}while(0)
 /** Safely copy one IPv6 address to another (src may be NULL) */
-#define ip6_addr_set(dest, src) do{(dest)->addr[0] = (src) == NULL ? 0 : (src)->addr[0]; \
-                                   (dest)->addr[1] = (src) == NULL ? 0 : (src)->addr[1]; \
-                                   (dest)->addr[2] = (src) == NULL ? 0 : (src)->addr[2]; \
-                                   (dest)->addr[3] = (src) == NULL ? 0 : (src)->addr[3];}while(0)
+#define ip6_addr_set(dest, src) do{(dest)->addr[0] = (((uint32)src & 0x7FFFFFFFU) == 0) ? 0 : (src)->addr[0]; \
+                                   (dest)->addr[1] = (((uint32)src & 0x7FFFFFFFU) == 0) ? 0 : (src)->addr[1]; \
+                                   (dest)->addr[2] = (((uint32)src & 0x7FFFFFFFU) == 0) ? 0 : (src)->addr[2]; \
+                                   (dest)->addr[3] = (((uint32)src & 0x7FFFFFFFU) == 0) ? 0 : (src)->addr[3];}while(0)
 
 /** Set complete address to zero */
 #define ip6_addr_set_zero(ip6addr)    do{(ip6addr)->addr[0] = 0; \

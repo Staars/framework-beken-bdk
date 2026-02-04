@@ -6,7 +6,6 @@
 
 #define os_printf                      bk_printf
 
-
 #define warning_prf                    bk_printf
 #define fatal_prf                      bk_printf
 #define null_prf                       os_null_printf

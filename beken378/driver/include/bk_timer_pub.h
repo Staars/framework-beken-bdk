@@ -1,7 +1,6 @@
 #ifndef _BK_TIMER_PUB_H_
 #define _BK_TIMER_PUB_H_
 
-
 #define TIMER_DEV_NAME                "bk_timer"
 
 #define BK_TIMER_FAILURE                (1)

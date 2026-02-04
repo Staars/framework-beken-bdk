@@ -166,6 +166,10 @@ struct hostapd_data {
 	void *msg_ctx; /* ctx for wpa_msg() calls */
 	void *msg_ctx_parent; /* parent interface ctx for wpa_msg() calls */
 
+#if CFG_WIFI_P2P_GO
+	u8 last_1x_eapol_key_replay_counter[8];
+#endif
+
 	struct wpa_authenticator *wpa_auth;
 	struct eapol_authenticator *eapol_auth;
 
@@ -188,6 +192,20 @@ struct hostapd_data {
 	struct l2_packet_data *l2;
 
 	int beacon_set_done;
+#ifdef CONFIG_WPS
+	struct wps_context *wps;
+
+	struct wpabuf *wps_beacon_ie;
+	struct wpabuf *wps_probe_resp_ie;
+
+	unsigned int ap_pin_failures;
+	unsigned int ap_pin_failures_consecutive;
+	struct upnp_wps_device_sm *wps_upnp;
+	unsigned int ap_pin_lockout_time;
+
+	struct wps_stat wps_stats;
+#endif /* CONFIG_WPS */
+
 
 	struct hostapd_probereq_cb *probereq_cb;
 	size_t num_probereq_cb;

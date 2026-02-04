@@ -37,23 +37,25 @@
 #include "typedef.h"
 #include "uart_pub.h"
 
-
+#define LWIP_NO_STDINT_H 1
 /*
  *   Typedefs for the types used by lwip -
  *   u8_t, s8_t, u16_t, s16_t, u32_t, s32_t, mem_ptr_t
  */
-typedef unsigned   char    u8_t;      /* Unsigned 8 bit quantity         */
-typedef signed     char    s8_t;      /* Signed    8 bit quantity        */
-typedef unsigned   short   u16_t;     /* Unsigned 16 bit quantity        */
-typedef signed     short   s16_t;     /* Signed   16 bit quantity        */
-typedef unsigned   long    u32_t;     /* Unsigned 32 bit quantity        */
-typedef signed     long    s32_t;     /* Signed   32 bit quantity        */
-//typedef unsigned   long    mem_ptr_t; /* Unsigned 32 bit quantity        */
+
+#ifndef LWIP_SIMPLE_TYPES
+#define LWIP_SIMPLE_TYPES 1
+typedef uint8_t   u8_t;
+typedef int8_t    s8_t;
+typedef uint16_t  u16_t;
+typedef int16_t   s16_t;
+typedef uint32_t  u32_t;
+typedef int32_t   s32_t;
+#endif 
+
 typedef int			       intptr_t;
 typedef unsigned int       uintptr_t;
 typedef int sys_prot_t;
-
-
 
 #if defined(__GNUC__)
  #define PACK_STRUCT_BEGIN

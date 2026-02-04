@@ -19,6 +19,8 @@
 #include "wlan_ui_pub.h"
 #include "param_config.h"
 #include "signal.h"
+#include "rwnx_defs.h"
+#include "bk_err.h"
 
 #if CFG_ROLE_LAUNCH
 #include "role_launch.h"
@@ -263,10 +265,19 @@ int rw_msg_send_add_if(const unsigned char *mac,
     if (!add_if_req_param)
         return -1;
 
+#if CFG_WIFI_P2P
+	p2p = false;
+#endif
+
     /* Set parameters for the ADD_IF_REQ message */
     os_memcpy(&(add_if_req_param->addr.array[0]), mac, ETH_ALEN);
     switch (iftype)
     {
+#if CFG_WIFI_P2P
+	case NL80211_IFTYPE_P2P_CLIENT:
+		p2p = true;
+		/* fall through */
+#endif
     case NL80211_IFTYPE_STATION:
         add_if_req_param->type = VIF_STA;
         break;
@@ -275,6 +286,11 @@ int rw_msg_send_add_if(const unsigned char *mac,
         add_if_req_param->type = VIF_IBSS;
         break;
 
+#if CFG_WIFI_P2P
+	case NL80211_IFTYPE_P2P_GO:
+		p2p = true;
+		/* fall through */
+#endif
     case NL80211_IFTYPE_AP:
         add_if_req_param->type = VIF_AP;
         break;
@@ -575,6 +591,7 @@ int rw_msg_send_scanu_req(SCAN_PARAM_T *scan_param)
 {
 	int i;
 	struct scanu_start_req *req;
+	uint8_t *extra_ies;
 
 #if CFG_ROLE_LAUNCH
 	if (rl_pre_sta_set_status(RL_STATUS_STA_SCANNING)) {
@@ -586,9 +603,11 @@ int rw_msg_send_scanu_req(SCAN_PARAM_T *scan_param)
 
 	/* Build the SCANU_START_REQ message */
 	req = ke_msg_alloc(SCANU_START_REQ, TASK_SCANU, TASK_API,
-					   sizeof(struct scanu_start_req));
+					   sizeof(struct scanu_start_req) + scan_param->extra_ies_len);
 	if (!req)
 		return -1;
+
+	extra_ies = (uint8_t *)(req + 1);
 
 	/* Set parameters */
 	req->vif_idx = scan_param->vif_idx;
@@ -618,8 +637,9 @@ int rw_msg_send_scanu_req(SCAN_PARAM_T *scan_param)
 		os_memcpy(req->ssid[i].array, scan_param->ssids[i].array, req->ssid[i].length);
 	}
 
-	req->add_ies = 0;
-	req->add_ie_len = 0;
+	req->add_ie_len = scan_param->extra_ies_len;
+	os_memcpy(extra_ies, scan_param->extra_ies, req->add_ie_len);
+	req->add_ies = (uint32_t)extra_ies;
 
 #if CFG_WPA_CTRL_IFACE
 	wpa_handler_signal((void *)SIGSCAN_START, scan_param->vif_idx);
@@ -944,9 +964,9 @@ int rw_msg_send_sm_external_auth_status(EXTERNAL_AUTH_PARAM_T *auth_param)
     if (!req)
         return -1;
 
-	req->vif_idx = auth_param->vif_idx;
-	req->status = auth_param->status;
-	
+    req->vif_idx = auth_param->vif_idx;
+    req->status = auth_param->status;
+
     /* Send the SM_CONNECT_REQ message to LMAC FW */
     return rw_msg_send(req, 0/*DUMMY*/, NULL);
 }
@@ -988,5 +1008,87 @@ int rw_msg_set_power(u8 vif_idx, u8 power)
     /* Send the MM_SET_POWER_REQ message to LMAC FW */
     return rw_msg_send(req, MM_SET_POWER_CFM, NULL);
 }
+
+#if CFG_WIFI_P2P
+int rw_msg_send_roc(u8 vif_index, unsigned int freq, uint32_t duration)
+{
+	struct mm_remain_on_channel_req *req;
+	struct mm_remain_on_channel_cfm cfm;
+	int ret;
+	struct rwnx_hw *rwnx_hw = &g_rwnx_hw;
+	struct rwnx_roc_elem *roc_elem;
+
+	/* FIXME: LOCK */
+    /* Check that no other RoC procedure has been launched */
+	//RWNX_LOGI("req:%d %d %d\n", freq, duration, !!rwnx_hw->roc_elem);
+    if (rwnx_hw->roc_elem) {
+        return BK_ERR_IN_PROGRESS;
+    }
+
+	roc_elem = os_zalloc(sizeof(struct rwnx_roc_elem));
+	if (!roc_elem)
+		return BK_ERR_NO_MEM;
+
+	roc_elem->freq = freq;
+	roc_elem->duration = duration;
+
+	req = ke_msg_alloc(MM_REMAIN_ON_CHANNEL_REQ, TASK_MM, TASK_API,
+					   sizeof(struct mm_remain_on_channel_req));
+	if (!req) {
+		os_free(roc_elem);
+		return BK_ERR_NO_MEM;
+	}
+
+    req->op_code      = MM_ROC_OP_START;
+    req->vif_index    = vif_index;
+#if CFG_IEEE80211AX
+	req->chan.band = PHY_BAND_2G4;
+	req->chan.type = PHY_CHNL_BW_20;
+	req->chan.prim20_freq = freq;
+	req->chan.center1_freq = freq;
+#else
+	req->band = PHY_BAND_2G4;
+	req->type = PHY_CHNL_BW_20;
+	req->prim20_freq = freq;
+	req->center1_freq = freq;
+	req->center2_freq = 0;
+#endif
+    req->duration_ms  = duration;
+
+	/* Send the MM_REMAIN_ON_CHANNEL_REQ message to LMAC FW */
+	ret = rw_msg_send(req, MM_REMAIN_ON_CHANNEL_CFM, &cfm);
+	if (ret || cfm.status) {
+		os_printf("%s: failed ret %d, cfm.status %d\n", __func__, ret, cfm.status);
+		os_free(roc_elem);
+		return -1;
+	} else {
+		rwnx_hw->roc_elem = roc_elem;
+	}
+
+	return ret;
+}
+
+int rw_msg_send_cancel_roc(u8 vif_index)
+{
+	struct mm_remain_on_channel_req *req;
+	struct rwnx_hw *rwnx_hw = &g_rwnx_hw;
+
+	if (!rwnx_hw->roc_elem)
+		return BK_ERR_PARAM;
+
+	req = ke_msg_alloc(MM_REMAIN_ON_CHANNEL_REQ, TASK_MM, TASK_API,
+					   sizeof(struct mm_remain_on_channel_req));
+	if (!req)
+		return BK_ERR_NO_MEM;
+
+    req->op_code      = MM_ROC_OP_CANCEL;
+
+	/* Send the MM_REMAIN_ON_CHANNEL_REQ message to LMAC FW */
+	return rw_msg_send(req, MM_REMAIN_ON_CHANNEL_REQ, NULL);
+}
+
+#endif // CFG_WIFI_P2P
+
+
 // eof
 

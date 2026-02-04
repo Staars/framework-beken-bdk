@@ -111,6 +111,7 @@ typedef struct
 *******************************************************************************/
 UINT32 flash_read(char *user_buf, UINT32 count, UINT32 address);
 UINT32 flash_write(char *user_buf, UINT32 count, UINT32 address);
+void flash_disable_cpu_data_wr(void);
 UINT32 flash_ctrl(UINT32 cmd, void *parm);
 #endif //_FLASH_H_
 // eof

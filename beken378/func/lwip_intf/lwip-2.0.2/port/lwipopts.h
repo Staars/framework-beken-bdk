@@ -44,10 +44,19 @@
 
 #define TCPIP_THREAD_NAME               "tcp/ip"
 #define TCPIP_THREAD_STACKSIZE          512
+
+#if CFG_OS_FREERTOS
+#define TCPIP_THREAD_PRIO               2
+#else
 #define TCPIP_THREAD_PRIO               7
+#endif
 
 #define DEFAULT_THREAD_STACKSIZE        200
+#if CFG_OS_FREERTOS
+#define DEFAULT_THREAD_PRIO             8
+#else
 #define DEFAULT_THREAD_PRIO             1
+#endif
 
 /* Disable lwIP asserts */
 #define LWIP_NOASSERT			        1

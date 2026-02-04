@@ -6,9 +6,8 @@
 #include "sys_rtos.h"
 #include "rtos_pub.h"
 
-//#define APP_DEBUG
-
-#ifdef APP_DEBUG
+#define APP_DEBUG     0
+#if APP_DEBUG
 #define APP_PRT       os_printf
 #define APP_WPRT      warning_prf
 #else
@@ -25,8 +24,8 @@ enum
     BMSG_SKT_TX_TYPE        = 4,
     BMSG_MEDIA_TYPE         = 5,
 
-#if CFG_USE_AP_PS
-    BMSG_TXING_TYPE         = 6,
+#if CFG_TX_BUFING
+    BMSG_TX_BUFING_TYPE     = 6,
 #endif
     BMSG_STA_PS_TYPE        = 7,
 

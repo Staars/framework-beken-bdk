@@ -15,7 +15,7 @@ typedef enum{
 
 #define DEFAULT_TXID_ID           (12345678)
 #if (CFG_SOC_NAME == SOC_BK7231N)
-#define DEFAULT_TXID_THERMAL      (350)
+#define DEFAULT_TXID_THERMAL      (330)
 #else
 #define DEFAULT_TXID_THERMAL      (280) //180430,7231:315,7231U:340
 #endif
@@ -43,6 +43,7 @@ typedef enum{
     TXPWR_TAB_DIF_GN40_ID,
     TXPWR_TAB_BLE_ID,
     TXPWR_TAB_CALI_STATUTS,
+    TXPWR_TAB_N20_ID,
     TXPWR_END,
     TXPWR_NON                   = TXPWR_TAB_TAB+0xFF
 }TXPWR_ELEM_ID;
@@ -53,6 +54,7 @@ typedef enum {
     TXPWR_TAB_G_RD              = 0x2u,
     TXPWR_TAB_N_RD              = 0x4u,
     TXPWR_TAB_BLE               = 0x8u,
+    TXPWR_TAB_N20_RD            = 0x16u,
 } TXPWR_IS_RD;
 
 typedef enum{
@@ -86,6 +88,13 @@ typedef enum{
 #define CALI_STATUS_PASS        1
 #define CALI_STATUS_FAIL        0
 
+typedef struct {
+    INT16 milli_volt;
+    INT8 p_index_delta_b; //[-128,127] since lengthof(power table)=128
+    INT8 p_index_delta_g;
+    INT8 p_index_delta_ble;
+} VOLT_PWR_ST, *VOLT_PWR_PTR;
+
 #if (CFG_SOC_NAME == SOC_BK7231N)
 typedef struct tmp_pwr_st {//do
     unsigned trx0x0c_12_15 : 4; //not used on BK7231N actually
@@ -116,6 +125,8 @@ struct temp_cal_pwr_st {
     INT16 shift;
     INT16 shift_g;
     INT16 shift_ble;
+    INT16 volt_shift_b;
+    INT16 volt_shift_g;
 };
 
 typedef enum
@@ -195,6 +206,9 @@ extern UINT32 manual_cal_load_adc_cali_flash(void);
 extern void manual_cal_do_single_temperature(void);
 extern void manual_cal_set_rate_dist_for_txpwr(int dist_b, int dist_g, int dist_n40, int dist_ble);
 
+extern VOLT_PWR_PTR manual_cal_set_volt_pwr(UINT16 cur_val);
+extern void rwnx_cal_do_volt_detect(UINT16 cur_val);
+
 extern void rwnx_cal_set_reg_mod_pa(UINT16 reg_mod, UINT16 reg_pa);
 extern void rwnx_cal_do_temp_detect(UINT16 cur_val, UINT16 thre, UINT16 *last);
 extern void rwnx_cal_set_lpfcap_iq(UINT32 lpfcap_i, UINT32 lpfcap_q);
@@ -227,7 +241,7 @@ extern void bk7011_get_tx_dc_comp(INT32 *tx_i_dc_comp, INT32 *tx_q_dc_comp);
 extern void bk7011_get_tx_gain_comp(INT32 *tx_i_gain_comp, INT32 *tx_q_gain_comp);
 extern void bk7011_get_tx_phase(INT32 *tx_phase_comp, INT32 *tx_phase_ty2);
 extern void bk7011_get_rx_err_wr(INT32 *rx_amp_err_wr, INT32 *rx_phase_err_wr, INT32 *rx_dc_gain_tab);
-extern void bk7011_get_tx_tssi_thred(INT32 *tx_tssi_thred_b, INT32 *tx_tssi_thred_g);
+extern void bk7011_get_tx_tssi_thred(INT32 *tx_tssi_thred_b, INT32 *tx_tssi_thred_g, INT32 *tx_tssi_thre_n20, INT32 *tx_tssi_thred_n40);
 
 extern void rwnx_cal_ble_set_rfconfig(void);
 extern void rwnx_cal_ble_recover_rfconfig(void);
@@ -257,11 +271,17 @@ extern UINT32 manual_cal_txpwr_tab_ready_in_flash(void);
 extern UINT32 rwnx_cal_load_user_rfcali_mode(int *rfcali_mode) __attribute__ ((weak));
 extern UINT32 rwnx_cal_load_user_g_tssi_threshold(int *tssi_g) __attribute__ ((weak));
 extern UINT32 rwnx_cal_load_user_b_tssi_threshold(int *tssi_b) __attribute__ ((weak));
+extern UINT32 rwnx_cal_load_user_n20_tssi_threshold(int *tssi_g) __attribute__ ((weak));
+extern UINT32 rwnx_cal_load_user_n40_tssi_threshold(int *tssi_b) __attribute__ ((weak));
 extern UINT32 rwnx_cal_is_auto_rfcali_printf_on(void) __attribute__ ((weak));
+extern UINT32 rwnx_cal_load_user_xtal(UINT32 *xtal) __attribute__ ((weak));
 
 extern void cmd_rfcali_cfg_mode(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 extern void cmd_rfcali_cfg_rate_dist(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 extern void cmd_rfcali_cfg_tssi_g(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 extern void cmd_rfcali_cfg_tssi_b(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
 extern void cmd_rfcali_show_data(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+extern void cmd_rfcali_cfg_tssi_n20(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+extern void cmd_rfcali_cfg_tssi_n40(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv);
+
 #endif // _BK7011_CAL_PUB_H_

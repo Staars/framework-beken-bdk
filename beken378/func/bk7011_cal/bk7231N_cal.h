@@ -2,20 +2,12 @@
 #define _BK7231U_CAL_H_
 
 #if (CFG_SOC_NAME != SOC_BK7231)
-
 #define INCLUDE_OS
-
-//#define SCAN_IQ_FILTER_CORNER
 
 ////Difference between pieces
 #define DIFFERENCE_PIECES_CFG        0
 
-//#define _11MBPS_MAX_POWER
-
 void delay05us(INT32 num);
-
-
-
 
 #define trx_reg_is_write(st_trxreg)     while(BK7231N_RC_REG.REG0x1->value & st_trxreg) 	{cpu_delay(1);}
 

@@ -36,17 +36,31 @@
 #include "mcu_ps_pub.h"
 #include "manual_ps_pub.h"
 #include "phy_trident.h"
-#include "BkDriverPwm.h"
 #include "lwip/ping.h"
 #include "ble_pub.h"
 #include "sensor.h"
 #include "spi_pub.h"
 #include "i2c_pub.h"
 #include "BkDriverTimer.h"
+#include "BkDriverUart.h"
+#include "BkDriverPwm.h"
 #include "saradc_intf.h"
 #include "spi_pub.h"
+#include "ate_app.h"
 #if CFG_BK_AWARE
 #include "bk_aware.h"
+#endif
+
+#if CFG_SUPPORT_LITEOS
+#include "los_config.h"
+#include "los_context.h"
+#include "los_task.h"
+#include "los_queue.h"
+#include "los_sem.h"
+#include "los_mux.h"
+#include "los_memory.h"
+#include "los_interrupt.h"
+#include "los_swtmr.h"
 #endif
 
 #if (CFG_SUPPORT_BLE == 1)
@@ -72,10 +86,9 @@ extern void sec_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 #define monitor_dbg(fmt, ...)
 #endif
 
-#ifndef MOC
 static void task_Command( char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv );
-#endif
 
+bk_uart_t cli_uart = BK_UART_2;
 int mico_debug_enabled;
 static struct cli_st *pCli = NULL;
 beken_semaphore_t log_rx_interrupt_sema = NULL;
@@ -118,7 +131,7 @@ static const struct cli_command *lookup_command(char *name, int len)
     int i = 0;
     int n = 0;
 
-    while (i < MAX_COMMANDS && n < pCli->num_commands)
+    while (i < MAX_CMD_COUNT && n < pCli->num_commands)
     {
         if (pCli->commands[i]->name == NULL)
         {
@@ -234,7 +247,7 @@ static int handle_input(char *inbuf)
             break;
         }
     }
-    while (!stat.done && ++i < INBUF_SIZE);
+    while (!stat.done && ++i < IN_BUF_LEN);
 
     if (stat.inQuote)
         return 2;
@@ -255,7 +268,7 @@ static int handle_input(char *inbuf)
     if (command == NULL)
         return 1;
 
-    os_memset(pCli->outbuf, 0, OUTBUF_SIZE);
+    os_memset(pCli->outbuf, 0, OUT_BUF_LEN);
     cli_putstr("\r\n");
 
     #if CFG_USE_STA_PS
@@ -265,7 +278,7 @@ static int handle_input(char *inbuf)
     }
     #endif
 
-    command->function(pCli->outbuf, OUTBUF_SIZE, argc, argv);
+    command->function(pCli->outbuf, OUT_BUF_LEN, argc, argv);
     cli_putstr(pCli->outbuf);
     return 0;
 }
@@ -281,7 +294,7 @@ static void tab_complete(char *inbuf, unsigned int *bp)
     os_printf("\r\n");
 
     /* show matching commands */
-    for (i = 0, n = 0, m = 0; i < MAX_COMMANDS && n < pCli->num_commands;
+    for (i = 0, n = 0, m = 0; i < MAX_CMD_COUNT && n < pCli->num_commands;
             i++)
     {
         if (pCli->commands[i]->name != NULL)
@@ -306,7 +319,7 @@ static void tab_complete(char *inbuf, unsigned int *bp)
     if (m == 1 && fm)
     {
         n = os_strlen(fm) - *bp;
-        if (*bp + n < INBUF_SIZE)
+        if (*bp + n < IN_BUF_LEN)
         {
             os_memcpy(inbuf + *bp, fm + *bp, n);
             *bp += n;
@@ -351,7 +364,7 @@ static int get_input(char *inbuf, unsigned int *bp)
 				inbuf[*bp] = ch;
 				(*bp)++;
 
-				if (ch >= INBUF_SIZE) {
+				if (ch >= IN_BUF_LEN) {
 					os_printf("Error: input buffer overflow\r\n");
 					os_printf(PROMPT);
 					*bp = 0;
@@ -402,7 +415,7 @@ static int get_input(char *inbuf, unsigned int *bp)
 			os_printf("%c", inbuf[*bp]);
 
 		(*bp)++;
-		if (*bp >= INBUF_SIZE) {
+		if (*bp >= IN_BUF_LEN) {
 			os_printf("Error: input buffer overflow\r\n");
 			os_printf(PROMPT);
 			*bp = 0;
@@ -452,7 +465,7 @@ static void print_bad_command(char *cmd_string)
 */
 static void cli_main( uint32_t data )
 {
-    bk_uart_set_rx_callback(CLI_UART, cli_rx_callback, NULL);
+    bk_uart_set_rx_callback(cli_uart, cli_rx_callback, NULL);
 
 	#if CFG_RF_OTA_TEST
 	demo_sta_app_init("CMW-AP", "12345678");
@@ -465,12 +478,12 @@ static void cli_main( uint32_t data )
 
         rtos_get_semaphore(&log_rx_interrupt_sema, BEKEN_NEVER_TIMEOUT);
 
-        if(get_input(pCli->inbuf, &pCli->bp))
+        while(get_input(pCli->inbuf, &pCli->bp))
         {
             msg = pCli->inbuf;
 
             if (os_strcmp(msg, EXIT_MSG) == 0)
-                break;
+                goto exit;
 
             ret = handle_input(msg);
             if (ret == 1)
@@ -482,20 +495,21 @@ static void cli_main( uint32_t data )
         }
     }
 
+exit:
     os_printf("CLI exited\r\n");
     os_free(pCli);
     pCli = NULL;
 
-    bk_uart_set_rx_callback(CLI_UART, NULL, NULL);
+    bk_uart_set_rx_callback(cli_uart, NULL, NULL);
     rtos_delete_thread(NULL);
 }
 
-#ifndef MOC
 static void task_Command( char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv )
 {
+#if CFG_OS_FREERTOS
     rtos_print_thread_status( pcWriteBuffer, xWriteBufferLen );
-}
 #endif
+}
 
 void tftp_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
@@ -778,8 +792,8 @@ void cli_monitor_cb(uint8_t *data, int len, wifi_link_info_t *info)
     channel_count ++;
 }
 
-xTaskHandle mtr_thread_handle = NULL;
-xTaskHandle cli_thread_handle = NULL;
+beken_thread_t mtr_thread_handle = NULL;
+beken_thread_t cli_thread_handle = NULL;
 
 uint32_t  mtr_stack_size = 2000;
 #define THD_MTR_PRIORITY                    5
@@ -906,7 +920,10 @@ void sta_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv
 
 	if (oob_ssid)
     {
-        unsigned char *oob_ssid_tp = conv_utf8((uint8_t*)oob_ssid);
+		char *oob_ssid_tp = oob_ssid;
+#if CFG_USE_CONV_UTF8
+		oob_ssid_tp = (char *)conv_utf8((uint8_t *)oob_ssid);
+#endif
 
 		if (oob_ssid_tp)
 		{
@@ -916,9 +933,21 @@ void sta_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv
 				return;
 			}
 #endif
+#if (CFG_SOC_NAME == SOC_BK7231N)
+			if (!get_ate_mode_state() && !os_strcasecmp((const char *)oob_ssid_tp, "CMW-AP")) {
+				extern char ate_mode_state;
+				extern void improve_rx_sensitivity(void);
 
+				ate_mode_state = 2; /* 0: no_ate, 1: ate, 2: fake_ate */
+				sctrl_rf_ps_enable_clear();
+				sctrl_flash_select_dco();
+				improve_rx_sensitivity();
+			}
+#endif
 			demo_sta_app_init((char *)oob_ssid_tp, connect_key);
+#if CFG_USE_CONV_UTF8
 			os_free(oob_ssid_tp);
+#endif
 		}
         else
         {
@@ -926,6 +955,83 @@ void sta_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv
         }
     }
 }
+
+#if CFG_WPA2_ENTERPRISE
+/**
+ * cli command: sta_eap <ssid>, connect to EAP-TLS AP.
+ *
+ * restrictions: EAP-TLS is based on PKI, both AP and STA may have certificate. So
+ * we must install certificate and private key to system. For example, `beken-iot-1.pem'
+ * is STA's certificate, `beken-iot-1.key' is private key, `rootca.pem' is the RootCA.
+ * These certificates and private key may be registered to system via `register_xfile'
+ * function.
+ */
+void sta_eap_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
+{
+#if 0 // TODO: backport to 3.0
+	char *ssid = NULL;
+	char *ca = "cacert.pem";
+	char *client_cert = "beken-iot-1.pem";
+	char *private_key = "beken-iot-1.key";
+	char *private_key_passwd = "12345678";
+	char *identity = "user";
+
+	if ((argc < 2) || (argc > 5)) {
+		CLI_LOGI("invalid argc number\n");
+		return;
+	}
+
+	ssid = argv[1];
+
+	char *oob_ssid_tp = ssid;
+#if CFG_USE_CONV_UTF8
+	oob_ssid_tp = (char *)conv_utf8((uint8_t *)ssid);
+#endif
+
+	if (oob_ssid_tp) {
+		int len;
+		wifi_sta_config_t *sta_config;
+
+		len = os_strlen((char *)oob_ssid_tp);
+		if (SSID_MAX_LEN < len) {
+			CLI_LOGI("ssid name more than 32 Bytes\n");
+			return;
+		}
+
+		sta_config = os_zalloc(sizeof(*sta_config));
+		if (!sta_config) {
+			CLI_LOGI("Cannot alloc STA config\n");
+			return;
+		}
+
+		os_strlcpy(sta_config->ssid, oob_ssid_tp, sizeof(sta_config->ssid));
+		sta_config->password[0] = '\0';	// No passwd needed fo EAP.
+		os_strlcpy(sta_config->eap, "TLS", sizeof(sta_config->eap));
+		os_strlcpy(sta_config->identity, identity, sizeof(sta_config->identity));
+		os_strlcpy(sta_config->ca, ca, sizeof(sta_config->ca));
+		os_strlcpy(sta_config->client_cert, client_cert, sizeof(sta_config->client_cert));
+		os_strlcpy(sta_config->private_key, private_key, sizeof(sta_config->private_key));
+		os_strlcpy(sta_config->private_key_passwd, private_key_passwd, sizeof(sta_config->private_key_passwd));
+		os_strlcpy(sta_config->phase1, "tls_disable_time_checks=1", sizeof(sta_config->phase1));
+
+		CLI_LOGI("ssid:%s key:%s\n", sta_config->ssid, sta_config->password);
+		CLI_LOGI("eap:%s identity:%s\n", sta_config->eap, sta_config->identity);
+		CLI_LOGI("ca:%s client_cert:%s\n", sta_config->ca, sta_config->client_cert);
+		CLI_LOGI("private_key:%s\n", sta_config->private_key);
+		BK_LOG_ON_ERR(bk_wifi_sta_set_config(sta_config));
+		BK_LOG_ON_ERR(bk_wifi_sta_start());
+
+		os_free(sta_config);
+
+#if CFG_USE_CONV_UTF8
+		os_free(oob_ssid_tp);
+#endif
+	} else {
+		os_printf("not buf for utf8\r\n");
+	}
+#endif
+}
+#endif
 
 #if CFG_WPA_CTRL_IFACE
 void wifi_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
@@ -1046,7 +1152,17 @@ void socket_show_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, cha
 
 void memory_show_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
+#if CFG_OS_FREERTOS
     cmd_printf("free memory %d\r\n", xPortGetFreeHeapSize());
+#elif CFG_SUPPORT_LITEOS
+	LOS_MEM_POOL_STATUS status;
+	(void)LOS_MemInfoGet(m_aucSysMem0, &status);
+
+    cmd_printf("freeNodeNum:%d, maxFreeNodeSize:%d, usedNodeNum:%d, usageWaterLine:%d\r\n", status.freeNodeNum, status.maxFreeNodeSize, status.usedNodeNum, status.usageWaterLine);
+    cmd_printf("used memory %d\r\n", status.totalUsedSize);
+    cmd_printf("free memory %d\r\n", status.totalFreeSize);
+#else
+#endif
 }
 
 
@@ -2034,6 +2150,7 @@ static void ble_command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 #elif (CFG_BLE_VERSION == BLE_VERSION_5_x)
 #include "app_ble.h"
 #include "app_sdp.h"
+#include "app_ble_init.h"
 void ble_notice_cb(ble_notice_t notice, void *param)
 {
 	switch (notice) {
@@ -2263,7 +2380,7 @@ static void ble_command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char
 	{
 		ble_set_notice_cb(ble_notice_cb);
 	#if BLE_SDP_CLIENT
-		register_app_sdp_service_tab(sizeof(service_tab)/sizeof(app_sdp_service_uuid),service_tab);
+		register_app_sdp_service_tab(sizeof(service_tab)/sizeof(app_sdp_service_uuid),(app_sdp_service_uuid *)service_tab);
 		app_sdp_service_filtration(0);
 		register_app_sdp_characteristic_callback(ble_app_sdp_characteristic_cb);
 		register_app_sdp_charac_callback(app_sdp_charac_cb);
@@ -2594,6 +2711,9 @@ static const struct cli_command built_ins[] =
     {"softap", "softap ssid key", softap_Command},
     {"stopintf", "stopintf intfacename", stop_wlan_intface_Command},
     {"sta", "sta ap_ssid key", sta_Command},
+#if CFG_WPA2_ENTERPRISE
+	{"sta_eap", "sta_eap ssid password [identity] [client_cert] [private_key]", sta_eap_Command},
+#endif
 #if (CFG_WFA_CERT || CFG_WPA_CTRL_IFACE)
     {"net", "wifi net config", net_Command},           // 8k rom size
 #endif
@@ -2668,9 +2788,11 @@ static const struct cli_command built_ins[] =
 #endif
 
 #if (CFG_SOC_NAME != SOC_BK7231)
-    {"rfcali_cfg_mode",      "1:manual, 0:auto",      cmd_rfcali_cfg_mode},
+    {"rfcali_cfg_mode",      "1:manual, 0:auto, others: clear flash mode",      cmd_rfcali_cfg_mode},
     {"rfcali_cfg_tssi_g",    "0-255",                 cmd_rfcali_cfg_tssi_g},
     {"rfcali_cfg_tssi_b",    "0-255",                 cmd_rfcali_cfg_tssi_b},
+    {"rfcali_cfg_tssi_n20",  "0-255",                 cmd_rfcali_cfg_tssi_n20},
+    {"rfcali_cfg_tssi_n40",  "0-255",                 cmd_rfcali_cfg_tssi_n40},
     {"rfcali_show_data",     "",                      cmd_rfcali_show_data},
     {"rfcali_cfg_rate_dist", "b g n40 ble (0-31)",    cmd_rfcali_cfg_rate_dist},
 #endif
@@ -2698,7 +2820,7 @@ void help_command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **arg
 #endif
 
     os_printf( "====Build-in Commands====\r\n" );
-    for (i = 0, n = 0; i < MAX_COMMANDS && n < pCli->num_commands; i++)
+    for (i = 0, n = 0; i < MAX_CMD_COUNT && n < pCli->num_commands; i++)
     {
         if (pCli->commands[i]->name)
         {
@@ -2721,7 +2843,7 @@ int cli_register_command(const struct cli_command *command)
     if (!command->name || !command->function)
         return 1;
 
-    if (pCli->num_commands < MAX_COMMANDS)
+    if (pCli->num_commands < MAX_CMD_COUNT)
     {
         /* Check if the command has already been registered.
         * Return 0, if it has been registered.
@@ -2930,6 +3052,8 @@ static void Deep_Sleep_Command(char *pcWriteBuffer, int xWriteBufferLen, int arg
 static void Ps_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
     UINT32 dtim = 0;
+
+    dtim = dtim;
 
 	#if PS_SUPPORT_MANUAL_SLEEP
     UINT32 standby_time = 0;
@@ -3218,8 +3342,8 @@ int adc_offfset, adc_value_2v;
 static void adc_detect_callback(int new_mv, void *user_data)
 {
 	static int cnt = 0;
-	new_mv = (void *)(new_mv << (adc_accuracy - 1));
-	test_adc.user_data = new_mv;
+	new_mv = (new_mv << (adc_accuracy - 1));
+	test_adc.user_data = (void *)new_mv;
 
 	if (cnt++ >= 100)
 	{
@@ -3232,12 +3356,12 @@ static void adc_detect_callback1(int new_mv, void *user_data)
 {
 	static int total = 0;
 	static int cnt = 0;
-	int reg, low_adc;
+	int low_adc;
 	static int temp = 0;
 	if (temp++ < 100)
 		return;
-	new_mv = (void *)(new_mv << (adc_accuracy - 1));
-	test_adc.user_data = new_mv;
+	new_mv = (new_mv << (adc_accuracy - 1));
+	test_adc.user_data = (void *)new_mv;
 
 	total += new_mv;
 	cnt++;
@@ -3261,10 +3385,10 @@ static void adc_detect_callback2(int new_mv, void *user_data)
 	static int temp = 0;
 	if (temp++ < 100)
 		return;
-	int reg, high_adc;
+	int high_adc;
 
-	new_mv = (void *)(new_mv << (adc_accuracy - 1));
-	test_adc.user_data = new_mv;
+	new_mv = (new_mv << (adc_accuracy - 1));
+	test_adc.user_data = (void *)new_mv;
 
 	total += new_mv;
 	cnt++;
@@ -3285,10 +3409,8 @@ static void adc_detect_callback2(int new_mv, void *user_data)
 static void adc_command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
 	UINT32 status;
-	DD_HANDLE flash_handle;
 	DD_HANDLE saradc_handle;
 	saradc_cal_val_t p_ADC_cal;
-	float voltage = 0.0;
 	saradc_desc_t *p_ADC_drv_desc = NULL;
 	int channel;
 	GLOBAL_INT_DECLARATION();
@@ -3466,14 +3588,14 @@ int cli_printf(const char *msg, ...)
 int cli_putstr(const char *msg)
 {
     if (msg[0] != 0)
-        bk_uart_send( CLI_UART, (const char *)msg, os_strlen(msg) );
+        bk_uart_send(cli_uart, (const char *)msg, os_strlen(msg) );
 
     return 0;
 }
 
 int cli_getchar(char *inbuf)
 {
-    if (bk_uart_recv(CLI_UART, inbuf, 1, BEKEN_WAIT_FOREVER) == 0)
+    if (bk_uart_recv(cli_uart, inbuf, 1, BEKEN_WAIT_FOREVER) == 0)
         return 1;
     else
         return 0;
@@ -3481,7 +3603,7 @@ int cli_getchar(char *inbuf)
 
 int cli_getchars(char *inbuf, int len)
 {
-    if(bk_uart_recv(CLI_UART, inbuf, len, BEKEN_WAIT_FOREVER) == 0)
+    if(bk_uart_recv(cli_uart, inbuf, len, BEKEN_WAIT_FOREVER) == 0)
         return 1;
     else
         return 0;
@@ -3489,7 +3611,7 @@ int cli_getchars(char *inbuf, int len)
 
 int cli_getchars_prefetch(char *inbuf, int len)
 {
-    if(bk_uart_recv_prefetch(CLI_UART, inbuf, len, BEKEN_WAIT_FOREVER) == 0)
+    if(bk_uart_recv_prefetch(cli_uart, inbuf, len, BEKEN_WAIT_FOREVER) == 0)
         return 1;
     else
         return 0;
@@ -3497,7 +3619,7 @@ int cli_getchars_prefetch(char *inbuf, int len)
 
 int cli_get_all_chars_len(void)
 {
-    return bk_uart_get_length_in_buffer(CLI_UART);
+    return bk_uart_get_length_in_buffer(cli_uart);
 }
 
 #if CFG_IPERF_TEST
@@ -3546,6 +3668,15 @@ void bk_peripheral_cli_init();
 int cli_init(void)
 {
     int ret;
+
+    if (UART1_PORT == uart_print_port)
+    {
+        cli_uart = BK_UART_1;
+    }
+    else
+    {
+        cli_uart = BK_UART_2;
+    }
 
     pCli = (struct cli_st *)os_malloc(sizeof(struct cli_st));
     if (pCli == NULL)
@@ -3599,6 +3730,5 @@ init_general_err:
 
     return kGeneralErr;
 }
-
 // eof
 

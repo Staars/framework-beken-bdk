@@ -8,7 +8,7 @@
 static int bk_airkiss_decode_status;
 uint32_t airkiss_start_flag = 0;
 static volatile uint8_t airkiss_current_channel;
-xTaskHandle  airkiss_thread_handle = NULL;
+beken_thread_t  airkiss_thread_handle = NULL;
 static beken_semaphore_t airkiss_decode_over_sema;
 static airkiss_context_t *airkiss_context_ptr = NULL;
 static beken_timer_t airkiss_switch_channel_timer;
@@ -189,7 +189,7 @@ void bk_airkiss_start_udp_boardcast(u8 random_data)
 		BK_AIRKISS_PRT("udp-sendto:%d\r\n", i);
 		
         err = sendto(udp_broadcast_fd, &random_data, 1, 0, (struct sockaddr *)&remote_skt, sizeof(remote_skt));
-		vTaskDelay(2);
+		rtos_thread_msleep(10);
 		
         if(err == -1) 
         {
@@ -288,7 +288,9 @@ static void bk_airkiss_thread_entry(void *parameter)
 _exit:
     bk_airkiss_clear_start_flag();
     bk_airkiss_resource_destroy();
+	#if CFG_OS_FREERTOS
 	BK_AIRKISS_PRT("bk_airkiss_thread_entry exit:%d\r\n", xPortGetFreeHeapSize());
+	#endif
 
 	airkiss_thread_handle = NULL;
 	rtos_delete_thread(NULL);
@@ -298,7 +300,9 @@ uint32_t bk_airkiss_init(void)
 {	
 	OSStatus ret;
 
+#if CFG_OS_FREERTOS
 	BK_AIRKISS_PRT("bk_airkiss_init:%d\r\n", xPortGetFreeHeapSize());
+#endif
 
     bk_wlan_stop_monitor();
 	bk_airkiss_set_start_flag();

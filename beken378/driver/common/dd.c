@@ -134,7 +134,11 @@ static DD_INIT_S dd_init_tbl[] =
 #if CFG_USE_I2S
     //{I2S_DEV_NAME,          i2s_init,                   i2s_exit},
 #endif
+
+#if CFG_SUPPORT_SARADC
     {SARADC_DEV_NAME,       saradc_init,                saradc_exit},
+#endif
+
 #if (CFG_SOC_NAME != SOC_BK7231)
     {IRDA_DEV_NAME,         irda_init,                  irda_exit},
 #endif

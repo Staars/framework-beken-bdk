@@ -505,6 +505,14 @@ int crypto_get_random(void *buf, size_t len);
 struct crypto_bignum;
 
 /**
+ * struct crypto_key - key
+ *
+ * Internal data structure for ssl key. The contents is specific
+ * to the used crypto library.
+ */
+struct crypto_key;
+
+/**
  * crypto_bignum_init - Allocate memory for bignum
  * Returns: Pointer to allocated bignum or %NULL on failure
  */
@@ -519,11 +527,24 @@ struct crypto_bignum * crypto_bignum_init(void);
 struct crypto_bignum * crypto_bignum_init_set(const u8 *buf, size_t len);
 
 /**
+ * crypto_bignum_init_set - Allocate memory for bignum and set the value (uint)
+ * @val: Value to set
+ * Returns: Pointer to allocated bignum or %NULL on failure
+ */
+struct crypto_bignum * crypto_bignum_init_uint(unsigned int val);
+
+/**
  * crypto_bignum_deinit - Free bignum
  * @n: Bignum from crypto_bignum_init() or crypto_bignum_init_set()
  * @clear: Whether to clear the value from memory
  */
 void crypto_bignum_deinit(struct crypto_bignum *n, int clear);
+
+/**
+ * crypto_bignum_bits - bignum bits
+ * Returns: number of bignum bits
+ */
+int crypto_bignum_bits(const struct crypto_bignum *a);
 
 /**
  * crypto_bignum_to_bin - Set binary buffer to unsigned bignum
@@ -613,6 +634,19 @@ int crypto_bignum_div(const struct crypto_bignum *a,
 		      struct crypto_bignum *c);
 
 /**
+ * crypto_bignum_addmod - d = a + b (mod c)
+ * @a: Bignum
+ * @b: Bignum
+ * @c: Bignum
+ * @d: Bignum; used to store the result of (a + b) % c
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bignum_addmod(const struct crypto_bignum *a,
+			 const struct crypto_bignum *b,
+			 const struct crypto_bignum *c,
+			 struct crypto_bignum *d);
+
+/**
  * crypto_bignum_mulmod - d = a * b (mod c)
  * @a: Bignum
  * @b: Bignum
@@ -624,6 +658,17 @@ int crypto_bignum_mulmod(const struct crypto_bignum *a,
 			 const struct crypto_bignum *b,
 			 const struct crypto_bignum *c,
 			 struct crypto_bignum *d);
+
+/**
+ * crypto_bignum_sqrmod - c = a^2 (mod b)
+ * @a: Bignum
+ * @b: Bignum
+ * @c: Bignum; used to store the result of a^2 % b
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bignum_sqrmod(const struct crypto_bignum *a,
+			 const struct crypto_bignum *b,
+			 struct crypto_bignum *c);
 
 /**
  * crypto_bignum_rshift - r = a >> n
@@ -730,6 +775,9 @@ const struct crypto_bignum * crypto_ec_get_prime(struct crypto_ec *e);
  * Returns: Order (bignum) of the group
  */
 const struct crypto_bignum * crypto_ec_get_order(struct crypto_ec *e);
+
+const struct crypto_bignum * crypto_ec_get_a(struct crypto_ec *e);
+const struct crypto_bignum * crypto_ec_get_b(struct crypto_ec *e);
 
 /**
  * struct crypto_ec_point - Elliptic curve point

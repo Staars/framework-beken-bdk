@@ -19,4 +19,10 @@ typedef struct tvideo_ota_st
     UINT32 http_timeout;
 } TV_OTA_ST, *TV_OTA_PTR;
 
+typedef struct temp_message
+{
+    u32 dmsg;
+    u32 data;
+} DRONE_MSG_T;
+
 #endif  // __VOID_DEMO_PUB_H__

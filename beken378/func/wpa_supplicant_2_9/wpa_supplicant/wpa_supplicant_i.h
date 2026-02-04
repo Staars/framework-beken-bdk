@@ -693,7 +693,9 @@ struct wpa_supplicant {
 	unsigned int own_scan_running:1;
 	unsigned int clear_driver_scan_cache:1;
 	unsigned int manual_scan_id;
+#ifdef CONFIG_WPA_FIXED_SCAN_INTERVAL
 	struct os_reltime select_network_time;
+#endif
 	int scan_interval; /* time in sec between scans to find suitable AP */
 	int normal_scans; /* normal scans run before sched_scan */
 	int scan_for_connection; /* whether the scan request was triggered for
@@ -1131,9 +1133,8 @@ struct wpa_supplicant {
 
 	unsigned int ext_work_id;
 
-#ifdef CONFIG_FULL_SUPPLICANT
 	struct wpabuf *vendor_elem[NUM_VENDOR_ELEM_FRAMES];
-#endif
+
 	struct wmm_ac_assoc_data *wmm_ac_assoc_info;
 	struct wmm_tspec_element *tspecs[WMM_AC_NUM][TS_DIR_IDX_COUNT];
 	struct wmm_ac_addts_request *addts_request;

@@ -20,8 +20,11 @@
 #include "include.h"
 #include "rtos_pub.h"
 
-#include "list.h"
+#include "utils/list.h"
 
+#ifdef assert
+#undef assert
+#endif
 #define assert ASSERT
 
 //#define ELOOP_DEBUG
@@ -148,11 +151,12 @@ struct eloop_data {
 
 enum wpah_flags {
 	WPAH_FLAG_FREE = 0x01,
+	WPAH_FLAG_DELAY = 0x02,
 };
 
 typedef struct wpah_msg_st {
 	uint32_t argu;
-	
+
 #if CFG_WPA_CTRL_IFACE
 	uint16_t cmd;
 	uint16_t flags;

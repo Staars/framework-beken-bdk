@@ -17,7 +17,6 @@
 #include "compiler.h"
 #include "intc.h"
 #include "intc_pub.h"
-
 #include "include.h"
 #include "arm_arch.h"
 #include "drv_model_pub.h"
@@ -62,6 +61,53 @@ void intc_hdl_entry(UINT32 int_status)
             return;
         }
     }
+}
+
+uint32_t intc_service_trigger(UINT8 int_num)
+{
+    ISR_T *cur_ptr;
+	uint32_t ret = INTC_FAILURE;
+
+	if(int_num >= sizeof(_isrs) / sizeof(_isrs[0]))
+	{
+		goto tri_exit;
+	}
+		
+    cur_ptr = &_isrs[int_num];
+	if(cur_ptr->isr_func)
+	{
+		cur_ptr->isr_func();
+	}
+
+	ret = INTC_SUCCESS;
+
+tri_exit:
+	return ret;
+}
+
+uint32_t intc_service_unregister(UINT8 int_num)
+{
+    ISR_T *cur_ptr;
+
+    GLOBAL_INT_DECLARATION();
+
+    cur_ptr = &_isrs[int_num];
+    INTC_PRT("unreg_isr:%d:%d:%p\r\n", int_num);
+
+    GLOBAL_INT_DISABLE();
+    if (list_empty(&isr_hdr.isr))
+    {
+        goto unreg_exit;
+    }
+
+    list_del(&cur_ptr->list);
+
+unreg_exit:
+    isrs_mask &= ~(BIT(int_num));
+	os_memset(&_isrs[int_num], 0, sizeof(_isrs[int_num]));
+    GLOBAL_INT_RESTORE();
+
+    return INTC_SUCCESS;
 }
 
 void intc_service_register(UINT8 int_num, UINT8 int_pri, FUNCPTR isr)
@@ -270,7 +316,7 @@ void intc_init(void)
     intc_enable(FIQ_MODEM);	
 
     param = GINTR_FIQ_BIT | GINTR_IRQ_BIT;
-    sddev_control(ICU_DEV_NAME, CMD_ICU_GLOBAL_INT_ENABLE, &param);
+    icu_ctrl(CMD_ICU_GLOBAL_INT_ENABLE, &param);
 
     return;
 }
@@ -329,35 +375,35 @@ void bk_show_register (struct arm_registers *regs)
         os_printf("0x%08x\n",*(reg1 + i));
     }
 
-    os_printf("IRQ:cpsr spsr r8-r14\n");
+    os_printf("\r\nIRQ:cpsr spsr r8-r14\n");
     reg1 = (const unsigned int *)0x400044;
     for(i=0;i<0x24>>2;i++)
     {
         os_printf("0x%08x\n",*(reg1 + i));
     }
 
-    os_printf("FIR:cpsr spsr r8-r14\n");
+    os_printf("\r\nFIQ:cpsr spsr r8-r14\n");
     reg1 = (const unsigned int *)0x400068;
     for(i=0;i<0x24>>2;i++)
     {
         os_printf("0x%08x\n",*(reg1 + i));
     }
 
-    os_printf("ABT:cpsr spsr r8-r14\n");
+    os_printf("\r\nABT:cpsr spsr r8-r14\n");
     reg1 = (const unsigned int *)0x40008c;
     for(i=0;i<0x24>>2;i++)
     {
         os_printf("0x%08x\n",*(reg1 + i));
     }
 
-    os_printf("UND:cpsr spsr r8-r14\n");
+    os_printf("\r\nUND:cpsr spsr r8-r14\n");
     reg1 = (const unsigned int *)0x4000b0;
     for(i=0;i<0x24>>2;i++)
     {
         os_printf("0x%08x\n",*(reg1 + i));
     }
 
-    os_printf("SVC:cpsr spsr r8-r14\n");
+    os_printf("\r\nSVC:cpsr spsr r8-r14\n");
     reg1 = (const unsigned int *)0x4000d4;
     for(i=0;i<0x24>>2;i++)
     {
@@ -365,7 +411,6 @@ void bk_show_register (struct arm_registers *regs)
     }
     
     os_printf("\r\n");
-
 }
 
 void bk_trap_udef(struct arm_registers *regs)

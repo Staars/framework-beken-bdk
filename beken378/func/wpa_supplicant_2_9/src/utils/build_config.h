@@ -19,8 +19,6 @@
 #include "rwnx_config.h"
 /* Insert configuration defines, e.g., #define EAP_MD5, here, if needed. */
 
-/* if want supplicant supports AP, enable CONFIG_AP */
-//#define CONFIG_AP
 #define NEED_AP_MLME
 #define CONFIG_NO_CONFIG_WRITE
 #define OS_NO_C_LIB_DEFINES
@@ -34,25 +32,6 @@
 
 /* Driver interface for beken driver */
 #define CONFIG_DRIVER_BEKEN                        1
-
-/* Driver interface for wired authenticator */
-//#define CONFIG_DRIVER_WIRED  1
-
-/* Driver interface for drivers using the nl80211 kernel interface */
-//#define CONFIG_DRIVER_NL80211 1
-
-/* Use libnl v2.0 (or 3.0) libraries */
-//#define CONFIG_LIBNL20    1
-/* Use libnl 3.2 libraries */
-//#define CONFIG_LIBNL32    1
-
-/* Driver interface for FreeBSD net80211 layer */
-//#define CONFIG_DRIVER_BSD  1
-/* Driver interface for no driver */
-//#define CONFIG_DRIVER_NONE  1
-
-/* IEEE 802.11F/IAPP */
-//#define CONFIG_IAPP   1
 
 /* WPA2/IEEE 802.11i RSN pre-authentication */
 //#define CONFIG_RSN_PREAUTH   1
@@ -153,18 +132,12 @@
 #if !CFG_ENABLE_WPA_LOG
 #define CONFIG_NO_STDOUT_DEBUG  	1
 #define CONFIG_NO_HOSTAPD_LOGGER   	1
-#endif
 #define CONFIG_NO_WPA_MSG          	1
+#endif
 
 /* Add support for writing debug log to a file: -f /tmp/hostapd.log
  * Disabled by default. */
 //#define CONFIG_DEBUG_FILE  1
-
-/* Add support for sending all debug messages (regardless of debug verbosity)
- *  to the Linux kernel tracing facility. This helps debug the entire stack by
- *  making it easy to record everything happening from the driver up into the
- *  same file, e.g., using trace-cmd. */
-//#define CONFIG_DEBUG_LINUX_TRACING  1
 
 /* Remove support for RADIUS accounting */
 #define CONFIG_NO_ACCOUNTING 1
@@ -178,10 +151,6 @@
 /* Enable support for fully dynamic VLANs. This enables hostapd to
  *  automatically create bridge and VLAN interfaces if necessary. */
 //#define CONFIG_FULL_DYNAMIC_VLAN 1
-
-/* Use netlink-based kernel API for VLAN operations instead of ioctl()
- *  Note: This requires libnl 3.1 or newer. */
-//#define CONFIG_VLAN_NETLINK  1
 
 /* Remove support for dumping internal state through control interface commands
  *  This can be used to reduce binary size at the cost of disabling a debugging option. */
@@ -199,12 +168,6 @@
 
 /* os_get_random() function is used to fetch random data when needed. */
 #define CONFIG_NO_RANDOM_POOL 1
-
-/* Should we use poll instead of select? Select is used by default. */
-//#define CONFIG_ELOOP_POLL  1
-
-/* Should we use epoll instead of select? Select is used by default. */
-//#define CONFIG_ELOOP_EPOLL 1
 
 /* Select TLS implementation
  *  openssl = OpenSSL (default)
@@ -286,6 +249,10 @@
 #define CONFIG_IEEE80211W_AP
 #endif /* CFG_SOFTAP_WPA3 */
 
+#if CFG_OWE
+#define CONFIG_OWE 1
+#endif
+
 #ifndef CONFIG_SME
 #define CONFIG_SAE_EXTERNAL
 #endif
@@ -298,6 +265,49 @@
 #endif
 
 /* fixed scan interval from previous connect request regardless of connection time */
-#define CONFIG_WPA_FIXED_SCAN_INTERVAL
+//#define CONFIG_WPA_FIXED_SCAN_INTERVAL
+
+#if CFG_WPA2_ENTERPRISE || CFG_WIFI_WPS
+#define IEEE8021X_EAPOL
+#define CONFIG_CRYPTO_INTERNAL
+#define CONFIG_INTERNAL_LIBTOMMATH
+#define LTM_FAST
+#define CONFIG_DES
+#define CONFIG_SHA256
+#define CONFIG_INTERNAL_SHA384
+#define CONFIG_INTERNAL_SHA512
+
+#if CFG_WPA2_ENTERPRISE
+#define EAP_TLS
+#define CONFIG_TLS_INTERNAL_CLIENT
+#endif
+
+#if CFG_WPA3_ENTERPRISE
+#define CONFIG_SUITEB
+#define CONFIG_SUITEB192
+#endif
+
+/* the ca.pem and client private-key.pem is hard-coded */
+#define IEEE8021X_EAPOL_DEMO
+#endif
+
+#if CFG_WIFI_WPS
+#define CONFIG_WPS
+#define CONFIG_WSC
+#define EAP_WSC
+#define CONFIG_BK_WPS_WORKAROUND
+#endif
+
+#if CFG_WIFI_P2P
+#define CONFIG_P2P
+#define CONFIG_OFFCHANNEL
+#define CONFIG_AP
+#if CFG_WIFI_P2P_GO
+#define CONFIG_WPS_AP
+#define EAP_SERVER_WSC
+#define EAP_SERVER_IDENTITY
+#define CONFIG_EAP_SERVER
+#endif
+#endif
 
 #endif /* BUILD_CONFIG_H */

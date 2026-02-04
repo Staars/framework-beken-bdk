@@ -9,7 +9,7 @@
 #ifndef SHA1_I_H
 #define SHA1_I_H
 
-#define CONFIG_CRYPTO_INTERNAL  1
+#define CONFIG_CRYPTO_INTERNAL
 
 struct SHA1Context {
 	u32 state[5];

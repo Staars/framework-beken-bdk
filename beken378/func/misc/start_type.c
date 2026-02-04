@@ -5,12 +5,10 @@
 #include "uart_pub.h"
 #include "wdt_pub.h"
 #include "target_util_pub.h"
-
 #include "sys_rtos.h"
 #include "arm_arch.h"
 #include "sys_ctrl.h"
 #include "sys_ctrl_pub.h"
-
 #include "start_type_pub.h"
 
 void bk_misc_crash_xat0_reboot(void)
@@ -106,12 +104,15 @@ void bk_misc_update_set_type(RESET_SOURCE_STATUS type)
     sctrl_ctrl(CMD_SET_SCTRL_RETETION, &misc_value);
 }
 
-void bk_misc_check_start_type()
+void bk_misc_check_start_type(void)
 {
 	if (RESET_SOURCE_CRASH_PER_XAT0 == start_type) {
 		uint32_t misc_value = CRASH_2ND_XAT0_VALUE & SW_RETENTION_VAL_MASK;
 		sctrl_ctrl(CMD_SET_SCTRL_RETETION, &misc_value);
+
+		#if (0 == CFG_JTAG_ENABLE)
 		bk_misc_crash_xat0_reboot();
+		#endif
 	}
 }
 #else
@@ -167,21 +168,22 @@ void bk_misc_check_start_type()
     *((volatile uint32_t *)(START_TYPE_DMEMORY_ADDR)) = (uint32_t)CRASH_XAT0_VALUE;
 	*((volatile uint32_t *)(START_TYPE_ADDR)) = (uint32_t)CRASH_XAT0_VALUE;
 
-    //os_printf("bk_misc_init_start_type %x %x\r\n",start_type,misc_value);
     return start_type;
 }
 
- void bk_misc_update_set_type(RESET_SOURCE_STATUS type)
+void bk_misc_update_set_type(RESET_SOURCE_STATUS type)
 {
     *((volatile uint32_t *)(START_TYPE_ADDR)) = (uint32_t)type;
-    //os_printf("bk_wlan_update_set_type %d\r\n",*((volatile uint32_t *)(START_TYPE_ADDR)));
 }
 
-void bk_misc_check_start_type()
+void bk_misc_check_start_type(void)
 {
     if (RESET_SOURCE_CRASH_PER_XAT0 == start_type) {
         *((volatile uint32_t *)(START_TYPE_ADDR)) = (uint32_t)CRASH_2ND_XAT0_VALUE;
+
+		#if (0 == CFG_JTAG_ENABLE)
         bk_misc_crash_xat0_reboot();
+		#endif
     }
 }
 #endif

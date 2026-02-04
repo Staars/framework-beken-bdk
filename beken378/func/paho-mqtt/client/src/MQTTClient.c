@@ -534,6 +534,7 @@ int mqtt_subscribe_with_results(MQTTClient* c, const char* topicFilter, enum QoS
     int rc = FAILURE;
     Timer timer;
     int len = 0;
+	int req_qos;
     MQTTString topic = MQTTString_initializer;
     topic.cstring = (char *)topicFilter;
 
@@ -546,7 +547,8 @@ int mqtt_subscribe_with_results(MQTTClient* c, const char* topicFilter, enum QoS
     TimerInit(&timer);
     TimerCountdownMS(&timer, c->command_timeout_ms);
 
-    len = MQTTSerialize_subscribe(c->buf, c->buf_size, 0, getNextPacketId(c), 1, &topic, (int*)&qos);
+	req_qos = qos;
+    len = MQTTSerialize_subscribe(c->buf, c->buf_size, 0, getNextPacketId(c), 1, &topic, (int*)&req_qos);
     if (len <= 0)
         goto exit;
     if ((rc = sendPacket(c, len, &timer)) != SUCCESS) // send the subscribe packet

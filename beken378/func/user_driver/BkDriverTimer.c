@@ -118,8 +118,6 @@ OSStatus bk_timer_stop(uint8_t timer_id)
     return kNoErr;
 }
 
-
-///////////////////
 #if BKDRIVERTIMRE_TEST_DEMO
 static void bk_timer_test_isr_cb(UINT8 arg)
 {

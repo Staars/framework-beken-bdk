@@ -19,10 +19,12 @@
 #include "rw_pub.h"
 #include "net_param_pub.h"
 #include "wlan_ui_pub.h"
+
 #if CFG_ROLE_LAUNCH
 #include "role_launch.h"
 #endif
-#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT)
+
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT) || (CFG_SUPPORT_LITEOS)
 #if (CFG_SOC_NAME != SOC_BK7231)
 #include "sys_ctrl_pub.h"
 #endif
@@ -31,7 +33,7 @@
 #error "BK7231 not support efuse!"
 #endif
 
-#define DEFAULT_MAC_ADDR "\xC8\x47\x8C\x42\x00\x48"
+#define DEFAULT_MAC_ADDR "\xC8\x47\x8C\x42\x88\x48"
 uint8_t system_mac[] = DEFAULT_MAC_ADDR;
 #endif
 
@@ -99,7 +101,7 @@ static void random_mac_address(u8 *mac)
 }
 #endif
 
-#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT)
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT) || (CFG_SUPPORT_LITEOS)
 void cfg_load_mac(u8 *mac)
 {
 #if (WIFI_MAC_POS == MAC_EFUSE)

@@ -191,6 +191,7 @@ enum
 
 
 typedef enum  {
+	BLE_CMD_NONE,
 	// ADV_CMD:FOR BLE 5.1
 	BLE_CREATE_ADV,
 	BLE_SET_ADV_DATA,

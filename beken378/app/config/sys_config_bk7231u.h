@@ -16,6 +16,23 @@
 #define CFG_IEEE80211N                             1
 
 /*section 1-----OS macro config-----*/
+#define RTOS_ALIOS_THINGS                          1
+#define RTOS_RT_THREAD                             2
+#define RTOS_FREERTOS                              3
+#define RTOS_LITEOS                                4
+
+#define CFG_SUPPORT_RTOS                           RTOS_FREERTOS
+
+#define FREERTOS_V9                                1
+#define FREERTOS_V10                               2
+#define CFG_FREERTOS_VER                           FREERTOS_V9
+
+#define ENC_METHOD_NULL                        1
+#define ENC_METHOD_XOR                         2
+#define ENC_METHOD_AES                         3
+
+#define FAST_CONNECT_INFO_ENC_METHOD               ENC_METHOD_NULL
+
 #define THD_APPLICATION_PRIORITY                   3
 #define THD_CORE_PRIORITY                          2
 #define THD_UMP3_PRIORITY                          4
@@ -38,18 +55,31 @@
 #define CFG_WPA_CTRL_IFACE                         1
 #define CFG_RWNX_QOS_MSDU                          1
 #define CFG_WLAN_FAST_CONNECT                      0
+#define CFG_WPA2_ENTERPRISE                        0
+#define CFG_WPA3_ENTERPRISE                        0
+/* WiFi Direct Support, CFG_WIFI_WPS must be enabled */
+#define CFG_WIFI_P2P                               0
+
+#if CFG_WIFI_P2P
+/* WPS(WSC) Support */
+#define CFG_WIFI_WPS                               1
+#define CFG_WIFI_P2P_GO                            1
+#endif
+
 /* PMF */
 #define CFG_IEEE80211W                             0
 #if CFG_WPA_CTRL_IFACE
 #undef CFG_ROLE_LAUNCH
 #define CFG_ROLE_LAUNCH                            0
 #endif
+
 #define CFG_WPA3                                   0
 #if CFG_WPA3
 #undef CFG_USE_WPA_29
 #define CFG_USE_WPA_29                             1
 #undef CFG_IEEE80211W
 #define CFG_IEEE80211W                             1
+#define CFG_OWE                                    0
 #endif
 #define CFG_WFA_CERT                               0
 #define CFG_ENABLE_BUTTON                          0
@@ -57,6 +87,7 @@
 #define CFG_EASY_FLASH                             1
 #define CFG_AP_SUPPORT_HT_IE                       0
 #define CFG_SUPPORT_BSSID_CONNECT                  0
+#define CFG_USE_CONV_UTF8                          0
 #define CFG_BK_AWARE                               0
 #define CFG_BK_AWARE_OUI                           "\xC8\x47\x8C"
 
@@ -96,8 +127,6 @@
 
 /*section 4-----DEBUG macro config-----*/
 #define CFG_UART_DEBUG                             0
-#define CFG_UART_DEBUG_COMMAND_LINE                1
-#define CFG_BACKGROUND_PRINT                       0
 #define CFG_SUPPORT_BKREG                          1
 #define CFG_ENABLE_WPA_LOG                         0
 #define CFG_IPERF_TEST                             0
@@ -144,10 +173,15 @@
 #define CFG_USE_TEMPERATURE_DETECT                 0
 
 /*section 12-----for video transfer*/
+#if CFG_WIFI_P2P
+#define CFG_USE_APP_DEMO_VIDEO_TRANSFER            1
+#define CFG_USE_CAMERA_INTF          		       1
+#else
 #define CFG_USE_APP_DEMO_VIDEO_TRANSFER            0
+#define CFG_USE_CAMERA_INTF          		       0
+#endif
 #define CFG_USE_HSLAVE_SPI                         0
 #define CFG_USE_SPIDMA                             0
-#define CFG_USE_CAMERA_INTF                        0
 
 /*section 13-----for GENERRAL DMA */
 #define CFG_GENERAL_DMA                            1
@@ -159,7 +193,11 @@
 #define CFG_USE_MCU_PS                             1
 
 #define CFG_USE_DEEP_PS                            1
+#if CFG_WIFI_P2P
+#define CFG_USE_BLE_PS                             0
+#else
 #define CFG_USE_BLE_PS                             1
+#endif
 #define CFG_USE_AP_IDLE                            0
 #define CFG_USE_FAKERTC_PS                         0
 
@@ -171,7 +209,14 @@
 #endif
 
 /*section 18-----AP support stas in power save*/
+#if CFG_WIFI_P2P
+#define CFG_USE_AP_PS                              1
+#define CFG_USE_P2P_PS                             1
+#define CFG_TX_BUFING                              1
+#else
 #define CFG_USE_AP_PS                              0
+#define CFG_TX_BUFING                              0
+#endif
 
 /*section 19-----for SDCARD HOST*/
 #if CFG_USB && CFG_USE_USB_DEVICE
@@ -208,7 +253,11 @@
 /*section 25 ----- use tick time calibrate*/
 #define CFG_USE_TICK_CAL                           1
 
+#if CFG_WIFI_P2P
+#define CFG_SUPPORT_BLE                            0
+#else
 #define CFG_SUPPORT_BLE                            1
+#endif
 #define CFG_SUPPORT_BLE_MESH                       0
 #define CFG_USE_PTA                                0
 
@@ -239,6 +288,12 @@
 #undef  CFG_USE_MCU_PS
 #define CFG_USE_MCU_PS                             RHINO_CONFIG_CPU_PWR_MGMT
 #endif
+
+#define FLASH_SELECTION_TYPE_DYNAMIC               0 //select with flashID runtime
+#define FLASH_SELECTION_TYPE_2M                    0x200000 //2MBytes
+#define FLASH_SELECTION_TYPE_4M                    0x400000 //4MBytes
+#define FLASH_SELECTION_TYPE_8M                    0x800000 //8MBytes
+#define CFG_FLASH_SELECTION_TYPE                   FLASH_SELECTION_TYPE_2M
 
 /* watchdog, freertos only */
 #define CFG_INT_WDG_ENABLED                        1

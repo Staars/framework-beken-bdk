@@ -290,9 +290,9 @@ typedef struct DRBG {
 #endif
 } DRBG;
 
-
+#ifndef CUSTOM_RAND_GENERATE_BLOCK
 static int wc_RNG_HealthTestLocal(int reseed);
-
+#endif
 /* Hash Derivation Function */
 /* Returns: DRBG_SUCCESS or DRBG_FAILURE */
 static int Hash_df(DRBG* drbg, byte* out, word32 outSz, byte type,
@@ -1107,7 +1107,7 @@ const byte outputB[] = {
     0xd4, 0x31, 0xf4, 0xc9, 0xf7, 0x04, 0x27, 0xdf
 };
 
-
+#ifndef CUSTOM_RAND_GENERATE_BLOCK
 __maybe_unused static int wc_RNG_HealthTestLocal(int reseed)
 {
     int ret = 0;
@@ -1169,7 +1169,7 @@ __maybe_unused static int wc_RNG_HealthTestLocal(int reseed)
 
     return ret;
 }
-
+#endif
 #endif /* HAVE_HASHDRBG */
 
 

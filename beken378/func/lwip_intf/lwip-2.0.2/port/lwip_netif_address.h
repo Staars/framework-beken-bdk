@@ -12,6 +12,7 @@ typedef enum _wifi_interface_type
 
 #define ADDR_TYPE_STATIC 1
 #define ADDR_TYPE_DHCP   0
+#define MAX_IPV6_ADDRESSES 3
 
 /** This data structure represents an IPv4 address */
 struct ipv4_config {
@@ -29,13 +30,20 @@ struct ipv4_config {
 	unsigned dns2;
 };
 
+#if LWIP_IPV6
+struct ipv6_config {
+	ip6_addr_t address;
+	u8 addr_state;
+};
+#endif
+
 /** Network IP configuration.
  *
  *  This data structure represents the network IP configuration
  *  for IPv4 as well as IPv6 addresses
  */
 struct wlan_ip_config {
-#ifdef CONFIG_IPV6
+#if LWIP_IPV6
 	/** The network IPv6 address configuration that should be
 	 * associated with this interface. */
 	struct ipv6_config ipv6[MAX_IPV6_ADDRESSES];

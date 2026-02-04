@@ -200,6 +200,7 @@
 #endif
 
 #include "sys_config.h"
+#include "xfile.h"
 
 /* make sure old RNG name is used with CTaoCrypt FIPS */
 #ifdef HAVE_FIPS
@@ -213,17 +214,21 @@
     /* blinding adds API not available yet in FIPS mode */
     #undef WC_RSA_BLINDING
 #endif
+#if defined(CFG_WPA3)
+#undef WOLFSSL_BEKEN
+#define WOLFSSL_BEKEN
+#endif
 
 #if defined(WOLFSSL_BEKEN)
+#if CFG_OS_FREERTOS
 #define FREERTOS
-#define SIZEOF_LONG_LONG 8
 #define WOLFSSL_HAVE_MIN
+#endif
+#define SIZEOF_LONG_LONG 8
 #define WOLFSSL_HAVE_MAX
 #define WOLFSSL_NO_CURRDIR
 #define TFM_TIMING_RESISTANT
 #define ECC_TIMING_RESISTANT
-#define NO_DSA
-#define NO_RSA
 #define TFM_ECC256
 #define ECC_SHAMIR
 #define NO_RC4
@@ -234,12 +239,12 @@
 #define NO_PSK
 #define NO_PWDBASED
 #define USE_FAST_MATH
+#define ALT_ECC_SIZE
 #define WC_NO_ASYNC_THREADING
 #define NO_DES3
 #define NO_WOLFSSL_DIR
 #define WOLFSSL_NO_ASM
 #define WOLFSSL_NO_SOCK
-#define NO_CERTS
 #define NO_WRITEV
 #define NO_ERROR_STRINGS
 #define WOLFSSL_SMALL_STACK
@@ -247,7 +252,13 @@
 #define HAVE_COMP_KEY
 #define WOLFSSL_KEY_GEN
 #define SQRTMOD_USE_MOD_EXP
-#define FP_MAX_BITS	768
+
+
+// TLS
+#define HAVE_EX_DATA
+#define SINGLE_THREADED
+#define NO_ASN_TIME
+
 
 //#define WC_RSA_BLINDING
 //#define BUILDING_WOLFSSL
@@ -255,8 +266,8 @@
 //#define _POSIX_THREADS
 //#define HAVE_THREAD_LS
 //#define HAVE_AESGCM
-//#define WOLFSSL_SHA512
-//#define WOLFSSL_SHA384
+#define WOLFSSL_SHA512
+#define WOLFSSL_SHA384
 //#define WOLFSSL_SHA224
 //#define WOLFSSL_SHA3
 //#define WOLFSSL_BASE64_ENCODE
@@ -275,7 +286,49 @@
 #define ECC256
 #define ECC384
 //#define ECC521
-#endif
+
+#if CFG_WPA2_ENTERPRISE
+#define HAVE_DH
+#define WOLFSSL_DER_LOAD
+#define HAVE_TLS_EXTENSIONS
+//#define HAVE_LWIP_NATIVE
+#define WOLFSSL_LWIP
+//#define FREERTOS_TCP
+#define NO_STDIO_FILESYSTEM
+#define USER_TIME
+//#define WOLFSSL_LEANPSK
+#define WC_NO_HARDEN
+#define HAVE_AES_CBC
+#define WOLFSSL_STATIC_RSA
+#define WOLFSSL_AES_128
+#define WOLFSSL_AES_256
+#define NO_SESSION_CACHE
+//#define NO_WOLFSSL_SERVER
+#define FP_MAX_BITS	4096
+#define OPENSSL_ALL
+#define OPENSSL_EXTRA
+
+#include "xfile.h"
+// Wrapper for stream functions
+#define XFILE      xFILE *
+#define XFOPEN     xfopen
+#define XFSEEK	   xfseek
+#define XFTELL	   xftell
+#define XFREAD	   xfread
+#define XFWRITE    xfwrite
+#define XFCLOSE    xfclose
+#define XSEEK_END  xSEEK_END
+#define XBADFILE   NULL
+#define XFGETS	   xfgets
+#define XREWIND    xfrewind
+#define WOLFSSL_USER_FILESYSTEM
+#else // CFG_WPA2_ENTERPRISE
+#define NO_DSA
+#define NO_RSA
+#define NO_CERTS
+#define FP_MAX_BITS	768
+#endif // CFG_WPA2_ENTERPRISE
+#endif // WOLFSSL_BEKEN
 
 
 #if defined(WOLFSSL_ESPIDF)
@@ -345,6 +398,7 @@
 	#else
 		#define XMALLOC(s, h, type)  pvPortMalloc((s))
 		#define XFREE(p, h, type)	 vPortFree((p))
+		#define XREALLOC(p, n, h, t) wolfSSL_Realloc((p), (n))
 	#endif
     #endif
     #if defined(HAVE_ED25519) || defined(WOLFSSL_ESPIDF)

@@ -15,6 +15,23 @@
 #define CFG_IEEE80211AX                            1
 
 /*section 1-----OS macro config-----*/
+#define RTOS_ALIOS_THINGS                          1
+#define RTOS_RT_THREAD                             2
+#define RTOS_FREERTOS                              3
+#define RTOS_LITEOS                                4
+
+#define CFG_SUPPORT_RTOS                           RTOS_FREERTOS
+
+#define FREERTOS_V9                                1
+#define FREERTOS_V10                               2
+#define CFG_FREERTOS_VER                           FREERTOS_V9
+
+#define ENC_METHOD_NULL                        1
+#define ENC_METHOD_XOR                         2
+#define ENC_METHOD_AES                         3
+
+#define FAST_CONNECT_INFO_ENC_METHOD               ENC_METHOD_NULL
+
 #define THD_APPLICATION_PRIORITY                   3
 #define THD_CORE_PRIORITY                          2
 #define THD_UMP3_PRIORITY                          4
@@ -41,6 +58,14 @@
 #define CFG_WPA_CTRL_IFACE                         1
 #define CFG_RWNX_QOS_MSDU                          1
 #define CFG_WLAN_FAST_CONNECT                      0
+#define CFG_WPA2_ENTERPRISE                        0
+#define CFG_WPA3_ENTERPRISE                        0
+/* WPS(WSC) Support */
+#define CFG_WIFI_WPS                               0
+/* WiFi Direct Support, CFG_WIFI_WPS must be enabled */
+#define CFG_WIFI_P2P                               0
+#define CFG_WIFI_P2P_GO                            0
+
 /* PMF */
 #define CFG_IEEE80211W                             0
 #if CFG_WPA_CTRL_IFACE
@@ -53,6 +78,7 @@
 #define CFG_USE_WPA_29                             1
 #undef CFG_IEEE80211W
 #define CFG_IEEE80211W                             1
+#define CFG_OWE                                    0
 #endif
 #define CFG_WFA_CERT                               0
 #define CFG_ENABLE_BUTTON                          0
@@ -60,6 +86,7 @@
 #define CFG_EASY_FLASH                             0
 #define CFG_AP_SUPPORT_HT_IE                       0
 #define CFG_SUPPORT_BSSID_CONNECT                  0
+#define CFG_USE_CONV_UTF8                          0
 #define CFG_BK_AWARE                               0
 #define CFG_BK_AWARE_OUI                           "\xC8\x47\x8C"
 
@@ -89,7 +116,6 @@
 
 /*section 4-----DEBUG macro config-----*/
 #define CFG_UART_DEBUG                             0
-#define CFG_BACKGROUND_PRINT                       0
 #define CFG_SUPPORT_BKREG                          1
 #define CFG_ENABLE_WPA_LOG                         0
 #define CFG_IPERF_TEST                             0
@@ -211,8 +237,6 @@
 #define BLE_WIFI_CO_REQUEST                        3
 #define RF_USE_POLICY                              WIFI_DEFAULT_BLE_REQUEST
 
-#define CFG_SUPPOET_BSSID_CONNECT                  0
-
 #define CFG_XTAL_FREQUENCE_40M                     40000000 //40MHz
 #define CFG_XTAL_FREQUENCE_26M                     26000000 //26MHz
 #if (CFG_SOC_NAME == SOC_BK7231N)
@@ -239,6 +263,12 @@
 #else
 #define CFG_LWIP_MEM_POLICY                       LWIP_REDUCE_THE_PLAN
 #endif
+
+#define FLASH_SELECTION_TYPE_DYNAMIC               0 //select with flashID runtime
+#define FLASH_SELECTION_TYPE_2M                    0x200000 //2MBytes
+#define FLASH_SELECTION_TYPE_4M                    0x400000 //4MBytes
+#define FLASH_SELECTION_TYPE_8M                    0x800000 //8MBytes
+#define CFG_FLASH_SELECTION_TYPE                   FLASH_SELECTION_TYPE_2M
 
 
 /* watchdog, freertos only */

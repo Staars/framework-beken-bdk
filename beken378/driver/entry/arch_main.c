@@ -15,11 +15,22 @@
 #include "app.h"
 #include "ate_app.h"
 #include "start_type_pub.h"
+#include "bk7011_cal_pub.h"
+#include "reg_mdm_cfg.h"
+
+#if CFG_SUPPORT_LITEOS
+#include "los_context.h"
+#include "los_task.h"
+#endif
 
 beken_semaphore_t extended_app_sema = NULL;
 uint32_t  extended_app_stack_size = 2048;
 
 extern void user_main_entry(void);
+extern void arm9_enable_alignfault(void);
+extern void rwnx_cal_dis_rx_filter_offset(void);
+extern int bk7011_reduce_vdddig_for_rx(int reduce);
+extern void uart_fast_init(void);
 
 void extended_app_launch_over(void)
 {  
@@ -39,6 +50,20 @@ void extended_app_waiting_for_launch(void)
 	(void)ret;
 }
 
+void improve_rx_sensitivity(void)
+{
+#if (CFG_SOC_NAME == SOC_BK7231N)
+	/* set TRX_REG12<8:7>=2 for rx */
+	rwnx_cal_set_reg_adda_ldo(2);
+	/* set MDM_REG202<23>=1 for rx */
+	mdm_cpemode_setf(1);
+	/* set MDM_REG206<17:16>=3 for band20 */
+	mdm_cfgsmooth_setf(3);
+	rwnx_cal_dis_rx_filter_offset();
+	bk7011_reduce_vdddig_for_rx(1);
+#endif
+}
+
 static void extended_app_task_handler(void *arg)
 {
     /* step 0: function layer initialization*/
@@ -48,6 +73,7 @@ static void extended_app_task_handler(void *arg)
     if(get_ate_mode_state())
     {
 	    ate_start();
+	    improve_rx_sensitivity();
     }
     else
     {
@@ -88,13 +114,31 @@ void extended_app_launch(void)
 	ASSERT(kNoErr == ret);
 }
 
+#ifdef CFG_SUPPORT_OHOS
+void __attribute__((weak)) OHOS_SystemInit(void)
+{
+	printf("@NOOS@");
+    return;
+}
+#endif
+
 void entry_main(void)
 {  
-    ate_app_init();
-	
-    bk_misc_init_start_type();
-    /* step 1: driver layer initialization*/
-    driver_init();
+#if (CFG_SOC_NAME == SOC_BK7231N)
+	uart_fast_init();
+#endif
+
+	arm9_enable_alignfault();
+#if CFG_SUPPORT_LITEOS
+	LOS_KernelInit();
+#endif
+
+	ate_app_init();
+
+	bk_misc_init_start_type();
+
+	/* step 1: driver layer initialization*/
+	driver_init();
 	bk_misc_check_start_type();
 	func_init_basic();
 
@@ -107,12 +151,21 @@ void entry_main(void)
        			  if you do not care the boot time, the function: extended_app_launch shall be invoked 
        			  BEFORE user_main_entry;*/
 	user_main_entry();	
-	
-    /* step 3: init of the most of devices*/
+
+	/* step 3: init of the most of devices*/
 	extended_app_launch();
-	
+
+#ifdef CFG_SUPPORT_OHOS
+	extern void OHOS_SystemInit(void);
+	OHOS_SystemInit();
+#endif
+
 #if (CFG_OS_FREERTOS)
-    vTaskStartScheduler();
+	vTaskStartScheduler();
+#endif
+
+#if CFG_SUPPORT_LITEOS
+	LOS_Start();
 #endif
 }
 // eof

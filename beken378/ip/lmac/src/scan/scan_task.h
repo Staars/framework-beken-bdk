@@ -70,6 +70,8 @@ enum scan_msg_tag
     SCAN_DONE_IND,
     /// Cancel scan request
     SCAN_CANCEL_REQ,
+    ///Cancel scan, when task has one scan result
+    SCAN_MEET_AND_END_REQ,
     /// Cancel scan confirmation
     SCAN_CANCEL_CFM,
 
@@ -117,6 +119,12 @@ struct scan_start_cfm
 
 /// Structure containing the parameters of the @ref SCAN_START_CFM message
 struct scan_cancel_cfm
+{
+    /// Status of the request
+    uint8_t status;
+};
+
+struct scan_done_ind
 {
     /// Status of the request
     uint8_t status;

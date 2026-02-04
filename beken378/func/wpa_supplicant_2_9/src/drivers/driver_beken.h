@@ -11,10 +11,15 @@
 
 #include "ddrv.h"
 #include "fake_socket.h"
+#include "sys_config.h"
 
 typedef void * c_addr_t;
 
+#if CFG_WPA2_ENTERPRISE
+#define TMP_BUF_LEN    (1500)
+#else
 #define TMP_BUF_LEN    (512)
+#endif
 
 #define WLAN_RATE_1M      BIT(0)
 #define WLAN_RATE_2M      BIT(1)
@@ -655,7 +660,8 @@ enum {
 	PRISM2_HOSTAPD_SET_OPER_STATE,
 #endif
 	PRISM2_HOSTAPD_EXTERNAL_AUTH_STATUS,
-
+	PRISM2_HOSTAPD_ROC,
+	PRISM2_HOSTAPD_CANCEL_ROC,
 };
 
 #define PRISM2_HOSTAPD_MAX_BUF_SIZE 1024
@@ -674,13 +680,13 @@ enum {
 struct prism2_hostapd_param {
 	u32 cmd;
 	u8 sta_addr[ETH_ALEN];
-    u8 vif_idx ;
+	u8 vif_idx;
 
 	union {
-		struct{
-			u8* own_addr;
-			u8* sta_addr;
-		}poll_null_data;
+		struct {
+			u8 *own_addr;
+			u8 *sta_addr;
+		} poll_null_data;
 
 		struct {
 			FUNC_2PARAM_PTR cb;
@@ -711,21 +717,21 @@ struct prism2_hostapd_param {
 			void *arg;
 		} add_sta;
 
-        struct {
-            u32 type;
-			u8* indx_ptr;
+		struct {
+			u32 type;
+			u8 *indx_ptr;
 		} add_if;
 
 		struct {
 			u32 inactive_sec;
 		} get_info_sta;
 
-        struct {
-            void *beacon;
-            u16 bcn_len;
-            u16 head_len;
-            u8 tim_len;
-        } bcn_change;
+		struct {
+			void *beacon;
+			u16 bcn_len;
+			u16 head_len;
+			u8 tim_len;
+		} bcn_change;
 
 		struct {
 			u8 alg[HOSTAP_CRYPT_ALG_NAME_LEN];
@@ -764,12 +770,12 @@ struct prism2_hostapd_param {
 			struct {
 				u8 ssid_len;
 				u8 ssid[SSID_MAX_LEN];
-#if CFG_SUPPORT_BSSID_CONNECT
-				u8 bssid[ETH_ALEN];
-#endif
-			}ssids[SCAN_SSID_MAX];
+			} ssids[SCAN_SSID_MAX];
+			u8 bssid[ETH_ALEN];
 			u8 ssids_num;
 			int freqs[14];		//FIXME: 5G
+			u16 extra_ies_len;
+			u8 extra_ies[0];
 		} scan_req;
 
 		struct wpa_scan_results *scan_rst;
@@ -813,7 +819,7 @@ struct prism2_hostapd_param {
 			u32 freq;
 			u32 csa_cnt;
 
-            struct csa_settings *settings;
+			struct csa_settings *settings;
 		} chan_switch;
 
 		struct {
@@ -839,7 +845,10 @@ struct prism2_hostapd_param {
 		struct {
 			u16 status;
 		} external_auth_status;
-
+		struct {
+			unsigned int freq;
+			unsigned int duration;
+		} roc;
 	} u;
 };
 

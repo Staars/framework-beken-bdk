@@ -1,10 +1,10 @@
 #include "include.h"
 #include "arm_arch.h"
 #include <string.h>
-
 #include "sys_rtos.h"
 #include "uart_pub.h"
 #include "mem_pub.h"
+#include "rtos_pub.h"
 
 INT32 os_memcmp(const void *s1, const void *s2, UINT32 n)
 {
@@ -26,6 +26,12 @@ void *os_memset(void *b, int c, UINT32 len)
     return (void *)memset(b, c, (unsigned int)len);
 }
 
+int os_memcmp_const(const void *a, const void *b, size_t len)
+{
+    return memcmp(a, b, len);
+}
+
+#if CFG_OS_FREERTOS
 void *os_realloc(void *ptr, size_t size)
 {
 	#ifdef FIX_REALLOC_ISSUE
@@ -47,11 +53,6 @@ void *os_realloc(void *ptr, size_t size)
 
 	return tmp;
 	#endif
-}
-
-int os_memcmp_const(const void *a, const void *b, size_t len)
-{
-    return memcmp(a, b, len);
 }
 
 #if !OSMALLOC_STATISTICAL
@@ -95,4 +96,6 @@ void os_free(void *ptr)
     }
 }
 #endif
+#endif
 // EOF
+

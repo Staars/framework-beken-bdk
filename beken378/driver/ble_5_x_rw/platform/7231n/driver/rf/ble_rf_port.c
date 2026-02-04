@@ -1,5 +1,5 @@
 #include "ble_rf_port.h"
-#include "rwip_config.h" // RW SW configuration
+#include "rwip_config.h"   // RW SW configuration
 #include "rwip.h"
 #include "rwip_int.h"
 #include "architect.h"      // architectural platform definitions
@@ -7,9 +7,9 @@
 #include <stddef.h>    // standard definitions
 #include <stdint.h>    // standard integer definition
 #include <stdbool.h>   // boolean definition
-#include <string.h>   // boolean definition
+#include <string.h>    // boolean definition
 #include "rwip.h"      // RW SW initialization
-#include "prf.h"      // RW SW initialization
+#include "prf.h"       // RW SW initialization
 #include "rwble.h"
 #include "uart_pub.h"
 #include "rtos_pub.h"
@@ -19,7 +19,6 @@
 #include "sys_ctrl_pub.h"
 #include "icu_pub.h"
 #include "intc_pub.h"
-
 #include "drv_model_pub.h"
 #include "include.h"
 #include "drv_model_pub.h"
@@ -27,7 +26,6 @@
 #include "uart_pub.h"
 #include "app_task.h"
 #include "udebug.h"
-//#include "bkDriverUart.h"
 #include "typedef.h"
 #include "common_bt.h"
 #include "arm_arch.h"

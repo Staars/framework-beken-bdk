@@ -445,7 +445,7 @@ enum wpa_vendor_elem_frame {
  * @brief WPA control command definition
  */
 typedef enum wpa_ctrl_cmd {
-	/* STA */
+	/* ============== STA ================ */
 	/* If enable multiple networks support  */
 	WPA_CTRL_CMD_ADD_NETWORK			 = 0,
 	WPA_CTRL_CMD_REMOVE_NETWORK,
@@ -485,6 +485,14 @@ typedef enum wpa_ctrl_cmd {
 	WPA_CTRL_CMD_STA_WPS_GET_PIN,
 	WPA_CTRL_CMD_STA_WPS_SET_PIN,
 
+	/* ============== P2P ================ */
+	WPA_CTRL_CMD_P2P_LISTEN,
+	WPA_CTRL_CMD_P2P_FIND,
+	WPA_CTRL_CMD_P2P_STOP_FIND,
+	WPA_CTRL_CMD_P2P_CONNECT,
+	WPA_CTRL_CMD_P2P_JOIN,
+	WPA_CTRL_CMD_P2P_CANCEL,
+
 	/* softAP */
 	WPA_CTRL_CMD_AP_ENABLE               = 100,
 	WPA_CTRL_CMD_AP_RELOAD,
@@ -499,10 +507,11 @@ typedef enum wpa_ctrl_cmd {
 	WPA_CTRL_CMD_AP_CHAN_SWITCH,
 
 
-	/* MISC */
+	/* ============== MISC ================ */
 	WPA_CTLR_CMD_ADD_NOTIFIER,
 	WPA_CTLR_CMD_REMOVE_NOTIFIER,
 
+	/* ============== EVENT ================ */
 	WPA_CTRL_CMD_SOCKET                  = 200,
 	WPA_CTRL_CMD_RW_EVT_START            = WPA_CTRL_CMD_SOCKET + 1,
 	WPA_CTRL_EVENT_AUTH_IND,
@@ -512,7 +521,16 @@ typedef enum wpa_ctrl_cmd {
 	WPA_CTRL_EVENT_DISCONNECT_IND,
 	WPA_CTRL_EVENT_CHAN_SWITCH_IND,
 	WPA_CTRL_EVENT_MGMT_IND,
+	WPA_CTRL_EVENT_REMAIN_ON_CHANNEL,
+	WPA_CTRL_EVENT_CANCEL_REMAIN_ON_CHANNEL,
+	WPA_CTRL_EVENT_P2P_GO_NEG_REQUEST,
 } wpa_ctrl_cmd_t;
+
+struct p2p_event_go_req {
+   u8  src[6];
+   u16 dev_passwd_id;
+   u8  go_intent;
+};
 
 int wpa_ctrl_request(wpa_ctrl_cmd_t cmd, void *data);
 

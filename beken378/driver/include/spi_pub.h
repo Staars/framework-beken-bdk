@@ -38,6 +38,10 @@ enum
     CMD_SPI_TXTRANS_EN,
     CMD_SPI_RXTRANS_EN,
     CMD_SPI_CS_EN,
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    CMD_SPI_SET_TX_FINISH_INT_CALLBACK,
+    CMD_SPI_SET_RX_FINISH_INT_CALLBACK,
+#endif
 };
 
 #define BK_SPI_DEBUG                0
@@ -47,9 +51,9 @@ enum
 #define BK_SPI_WPRT              warning_prf
 #define BK_SPI_FATAL             fatal_prf
 #else
-#define BK_SPI_PRT		    null_prf
-#define BK_SPI_WPRT		    null_prf
-#define BK_SPI_FATAL		null_prf
+#define BK_SPI_PRT		null_prf
+#define BK_SPI_WPRT		null_prf
+#define BK_SPI_FATAL		warning_prf
 #endif
 
 #define USE_SPI_GPIO_14_17          (0)
@@ -59,7 +63,7 @@ enum
 #define SPI_FLASH_HOLD_GPIO_NUM     (GPIO19)
 
 #define SPI_DEF_CLK_HZ              (10 * 1000 * 1000)
-#define TX_FINISH_FLAG              (1 << 31)
+#define TX_FINISH_FLAG              (1 << 0)
 
 #define BK_SPI_CPOL                 0x01
 #define BK_SPI_CPHA                 0x02
@@ -74,13 +78,18 @@ enum
 #define SPI_MASTER   (0<<3)								/* SPI master device */
 #define SPI_SLAVE    (1<<3)								/* SPI slave device */
 
+#define SPI_USE_4_LINE			0					/* 0-4 line mode*/
+#define SPI_USE_3_LINE			1					/* 1-3 line mode: no NSS*/
+#define SPI_LINE_MODE			SPI_USE_4_LINE		/* default:4 line mode*/
+
 #define SPI_MODE_0       (0 | 0)                        /* CPOL = 0, CPHA = 0 */
 #define SPI_MODE_1       (0 | SPI_CPHA)              /* CPOL = 0, CPHA = 1 */
 #define SPI_MODE_2       (SPI_CPOL | 0)              /* CPOL = 1, CPHA = 0 */
 #define SPI_MODE_3       (SPI_CPOL | SPI_CPHA)    /* CPOL = 1, CPHA = 1 */
 
-#define ENABLE			1
-#define DISABLE			0
+#define ENABLE				1
+#define DISABLE				0
+#define SPI_TX_LENGTH_MAX		4096
 
 struct spi_message
 {

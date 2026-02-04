@@ -53,8 +53,13 @@
 #define TX_AC0_TIMEOUT      5000000  ///< Background - 5s
 /// AC1 queue timeout
 #define TX_AC1_TIMEOUT      2000000  ///< Best effort - 2s
+#if CFG_WIFI_P2P
+/// AC2 queue timeout
+#define TX_AC2_TIMEOUT      400000   ///< Video - 400ms
+#else
 /// AC2 queue timeout
 #define TX_AC2_TIMEOUT      2000000   ///< Video - 400ms
+#endif
 /// AC3 queue timeout
 #define TX_AC3_TIMEOUT      200000   ///< Voice - 200ms
 /// BCN queue timeout
@@ -439,6 +444,10 @@ uint32_t txl_check_hd_is_current(uint32_t ac, struct txdesc *txd);
  ****************************************************************************************
  */
 void txl_cntrl_inc_pck_cnt(void);
+
+#if (NX_P2P)
+void txl_packet_trace(struct txdesc * txdesc);
+#endif
 
 /// @}
 /// @}

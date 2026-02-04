@@ -9,7 +9,7 @@
 #ifndef WPS_HOSTAPD_H
 #define WPS_HOSTAPD_H
 
-#ifdef CONFIG_WPS
+#ifdef CONFIG_WPS_AP
 
 int hostapd_init_wps(struct hostapd_data *hapd,
 		     struct hostapd_bss_config *conf);

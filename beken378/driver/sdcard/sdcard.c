@@ -120,7 +120,7 @@ static UINT32 last_WR_addr = 0;
 /******************************************************************************/
 static void sdcard_clock_set(uint8 clk_index)
 {
-	if(clk_index <= CLK_200K);
+	if(clk_index <= CLK_200K)
 	{
 		sdio_set_clock(clk_index);
 		sdcard.clk_cfg = clk_index;
@@ -599,7 +599,6 @@ static SDIO_Error sdcard_cmd12_process(uint32 addr)
 
 static SDIO_Error sdcard_send_read_stop(void)
 {
-	//send stop command
 	UINT32 reg;
 	int Ret = 0;
 
@@ -607,10 +606,11 @@ static SDIO_Error sdcard_send_read_stop(void)
 	reg &= ~(0xFFFF | (1 << 16) | (1 << 20));
 	reg |= (0x0101 | ((1 << 16) | (1 << 20)));
 	REG_WRITE(REG_SDCARD_FIFO_THRESHOLD,reg);
-	Ret = sdcard_cmd12_process(get_timeout_param(1));
+	Ret = sdcard_cmd12_process(0);
 
 	//close clock
 	sdio_clk_config(0);
+	
 	return Ret;
 }
 

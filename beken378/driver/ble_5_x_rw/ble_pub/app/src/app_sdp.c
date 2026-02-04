@@ -127,10 +127,11 @@ uint8_t appc_write_service_data_req(uint8_t conidx,uint16_t handle,uint16_t data
 	struct prf_sdp_db_env *sdp_db_env;
 	sdp_db_env = sdp_profiles_sdp_db_env(conhdl,handle);
 
-	if((kernel_state_get(KERNEL_BUILD_ID(TASK_BLE_APP,BLE_APP_INITING_INDEX(conidx))) == APPC_SERVICE_CONNECTED) && sdp_db_env)
+	if((kernel_state_get(KERNEL_BUILD_ID(TASK_BLE_APP,BLE_APP_INITING_INDEX(conidx))) == APPC_SERVICE_CONNECTED) && sdp_db_env &&
+		(KERNEL_TYPE_GET(prf_get_task_from_id(KERNEL_BUILD_ID((TASK_BLE_ID_SDP+sdp_db_env->prf_idx),sdp_db_env->prf_idx))) < TASK_BLE_NONE))
 	{
 		struct sdp_write_info_req *req = KERNEL_MSG_ALLOC_DYN(SDP_WRITE_VALUE_INFO_REQ,
-										prf_get_task_from_id(KERNEL_BUILD_ID((TASK_BLE_ID_SDP+sdp_db_env->prf_idx),0)),
+										prf_get_task_from_id(KERNEL_BUILD_ID((TASK_BLE_ID_SDP+sdp_db_env->prf_idx),sdp_db_env->prf_idx)),
 										KERNEL_BUILD_ID(TASK_BLE_APP,BLE_APP_INITING_INDEX(conidx)),
 										sdp_write_info_req, data_len);
 

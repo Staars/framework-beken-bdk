@@ -41,6 +41,7 @@
 #include "intc_pub.h"
 #include "power_save_pub.h"
 #include "bk7011_cal_pub.h"
+#include "ate_app.h"
 
 /*
  * STRUCTURES
@@ -1849,6 +1850,10 @@ static void phy_mdm_init(uint32_t tx_dc_off_comp)
     mdm_delaynormalgi_setf(17);
 
     // CPE mode
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    /* qunshan20210721: keep MDM_REG202<23>=1 for rx in ATE mode */
+    if(!get_ate_mode_state())
+#endif
     mdm_cpemode_setf(0);
 
     // Enable CCA lock IRQ
@@ -1856,6 +1861,7 @@ static void phy_mdm_init(uint32_t tx_dc_off_comp)
 
 #if (CFG_SOC_NAME == SOC_BK7231N)
     REG_WRITE((REG_MDM_CFG_BASE_ADDR + 0x226 * 4), REG_READ(REG_MDM_CFG_BASE_ADDR + 0x226 * 4) & 0xFFFE); //peak_cancel_bypass=0
+    REG_WRITE((REG_MDM_CFG_BASE_ADDR + 0xC0C * 4), 1); //11B_TX_GAUSS_FILTER_ENABLE=1
 #endif
 
     PHY_WPRT("phy_mdm_init-->Static MDM settings done\r\n");
@@ -1893,6 +1899,8 @@ void phy_disable_lsig_intr(void)
  */
 static void phy_agc_init(void)
 {
+    uint32_t agccca1;
+
     phy_pre_agc_init();
 
     // AGC events
@@ -1939,10 +1947,22 @@ static void phy_agc_init(void)
 
     // RWNXAGCCCA1 (CCA{FALL,RISE}THRDBM)
     // for when RWNXAGCCCACTRL[CCAENERGYEN] is on, clear bit8(saturation cca enable)
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    //Modem_81D[07:00]=RiseThreshold, CCA=1 when interference > RiseThreshold
+    //Modem_81D[19:12]=FallThreshold, CCA=0 when interference < FallThreshold
+    if (get_ate_mode_state())
+    {
+        agccca1 = 0x000ba0be; //RiseThreshold=-66,FallThreshold=-70
+    }
+    else
+#endif
+    {
+        agccca1 = 0x000bf0c3; //RiseThreshold=-61,FallThreshold=-65
+    }
 #if defined(CFG_SYS_CLOSE_CCA)
-    agc_rwnxagccca1_set((agc_rwnxagccca1_get() & ~0x000ff0ff) | 0x000bf0c3);
+    agc_rwnxagccca1_set((agc_rwnxagccca1_get() & ~0x000ff0ff) | agccca1);
 #else
-    agc_rwnxagccca1_set((agc_rwnxagccca1_get() & ~0x000ff1ff) | 0x000bf0c3);
+    agc_rwnxagccca1_set((agc_rwnxagccca1_get() & ~0x000ff1ff) | agccca1);
 #endif
 
     // RWNXAGCCCACTRL
@@ -2563,6 +2583,11 @@ void phy_set_channel(uint8_t band, uint8_t type, uint16_t prim20_freq,
 	#endif
 	
 	//if same channel is set just skip
+	if((0 == center1_freq) && (0 == center2_freq))
+	{
+		return;
+	}
+	
 	if ((phy_env->band == band)
 		&& (phy_env->chnl_type == type)
 		&& (phy_env->chnl_prim20_freq == prim20_freq)
@@ -2651,7 +2676,12 @@ void phy_set_channel(uint8_t band, uint8_t type, uint16_t prim20_freq,
 
     if(type == PHY_CHNL_BW_40) {
         rwnx_cal_set_40M_setting();
-        //agc_rwnxagcsat_set(0x8373335);
+#if (SOC_BK7231N == CFG_SOC_NAME)
+        if (prim20_freq >= 2462) {
+            /* set ADCclock=40MHz if channel >= 11 */
+            rwnx_cal_set_40M_extra_setting(0);
+        }
+#endif
     }
     else
     {
@@ -2659,8 +2689,7 @@ void phy_set_channel(uint8_t band, uint8_t type, uint16_t prim20_freq,
         rwnx_cal_set_20M_setting();
 #endif
         //agc_rwnxagcsat_set(0x8393537);
-    }
-    
+    }    
 }
 
 void phy_get_channel(struct phy_channel_info *info, uint8_t index)

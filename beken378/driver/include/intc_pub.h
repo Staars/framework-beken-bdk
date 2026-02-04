@@ -3,6 +3,9 @@
 
 #include "generic.h"
 
+#define INTC_FAILURE                (1)
+#define INTC_SUCCESS                (0)
+
 #if (CFG_SOC_NAME == SOC_BK7231N)
 #define FIQ_BT                           (31)
 #define FIQ_BLE                          (30)
@@ -155,9 +158,10 @@
 #define PRI_IRQ_UART2                        (25) 
 #define PRI_IRQ_UART1                        (26)
 #define PRI_IRQ_QSPI                         (27)
-
 #endif 
 
+extern uint32_t intc_service_trigger(UINT8 int_num);
+extern uint32_t intc_service_unregister(UINT8 int_num);
 extern void intc_service_register(UINT8 int_num, UINT8 int_pri, FUNCPTR isr);
 extern void intc_spurious(void);
 extern void intc_enable(int index);

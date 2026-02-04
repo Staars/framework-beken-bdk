@@ -15,7 +15,13 @@
 #include "gpio_bk7271.h"
 #endif
 saradc_desc_t *saradc_desc = NULL;
-saradc_calibrate_val saradc_val = {0x55, 0x354};
+saradc_calibrate_val saradc_val = {
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    0x6B8, 0xD7A /* 1Volt, 2Volt*/
+#else
+    0x55, 0x354
+#endif
+};
 static volatile u8 saradc_is_busy = 0;
 static volatile u8 saradc_accuracy = 0;
 static DD_OPERATIONS saradc_op = {
@@ -63,12 +69,35 @@ void saradc_exit(void)
 	ddev_unregister_dev(SARADC_DEV_NAME);
 }
 
+#if (CFG_SOC_NAME == SOC_BK7231N)
+static void adc_delay(INT32 num)
+{
+    volatile INT32 i, j;
+
+    for(i = 0; i < num; i ++)
+    {
+        for(j = 0; j < 200; j ++)
+            ;
+    }
+}
+#endif
+
 static void saradc_enable_sysctrl(void)
 {
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    UINT32 param = 0;
+    sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_SET_GADC_SEL, &param);
+    adc_delay(3);
+#endif
 }
 
 static void saradc_disable_sysctrl(void)
 {
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    UINT32 param = 1;
+    sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_SET_GADC_SEL, &param);
+    adc_delay(3);
+#endif
 }
 
 static void saradc_enable_icu_config(void)
@@ -199,6 +228,7 @@ static UINT32 saradc_open(UINT32 op_flag)
     }
     saradc_is_busy = 1;
 
+	saradc_enable_sysctrl();
 	saradc_enable_icu_config();
 
     saradc_desc = p_saradc_desc;
@@ -257,7 +287,9 @@ static UINT32 saradc_pause()
 {
     UINT32 value;
 
+#if (CFG_SOC_NAME != SOC_BK7231N)
     saradc_disable_sysctrl();
+#endif
 
 	value = REG_READ(SARADC_ADC_CONFIG);
     value &= ~(SARADC_ADC_CHNL_EN);
@@ -280,7 +312,9 @@ static UINT32 saradc_resume(void)
 {
     UINT32 value = 0;
 
+#if (CFG_SOC_NAME != SOC_BK7231N)
     saradc_enable_sysctrl();
+#endif
     saradc_enable_icu_config();
 
     // clear fifo
@@ -320,7 +354,14 @@ static UINT32 saradc_close(void)
 
 	GLOBAL_INT_DISABLE();
     saradc_disable_interrupt();
+
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    /*It's necessary to enable adc, before disable saradc*/
+    value = REG_READ(SARADC_ADC_CONFIG);
+    value |= (SARADC_ADC_CHNL_EN);
+    REG_WRITE(SARADC_ADC_CONFIG, value);
     saradc_disable_sysctrl();
+#endif
 
 	value = REG_READ(SARADC_ADC_CONFIG);
     value &= ~(SARADC_ADC_MODE_MASK << SARADC_ADC_MODE_POSI);
@@ -519,20 +560,21 @@ void saradc_ensure_close(void)
 
 float saradc_calculate(UINT16 adc_val)
 {
-#if ( (CFG_SOC_NAME != SOC_BK7271) && (CFG_SOC_NAME != SOC_BK7221U))
     float practic_voltage;
+#if (CFG_SOC_NAME == SOC_BK7231N)
+    /* (adc_val - low) / (practic_voltage - 1Volt) = (high - low) / 1Volt */
+    /* practic_voltage = (adc_val - low) / (high - low) + 1Volt */
+    practic_voltage = (float)(adc_val - saradc_val.low);
+    practic_voltage = (practic_voltage / (float)(saradc_val.high - saradc_val.low)) + 1;
+#elif ( (CFG_SOC_NAME != SOC_BK7271) && (CFG_SOC_NAME != SOC_BK7221U))
     practic_voltage = ((adc_val - saradc_val.low) * 1.8);
     practic_voltage = (practic_voltage / (saradc_val.high - saradc_val.low)) + 0.2;
-    return practic_voltage;
 #else
-
-	 float voltage = 0.0;
-	 voltage = (adc_val -(saradc_val.low-2048));
-	 voltage = voltage/(saradc_val.high  - (saradc_val.low-2048));
-	 voltage = 2*voltage;
-	 return voltage;
-
+	 practic_voltage = (adc_val -(saradc_val.low-2048));
+	 practic_voltage = practic_voltage/(saradc_val.high  - (saradc_val.low-2048));
+	 practic_voltage = 2*practic_voltage;
 #endif
+    return practic_voltage;
 }
 
 void saradc_calculate_step1(void)

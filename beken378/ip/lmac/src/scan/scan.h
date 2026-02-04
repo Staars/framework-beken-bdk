@@ -164,6 +164,7 @@ void scan_probe_req_tx(void);
  ****************************************************************************************
  */
 void scan_send_cancel_cfm(uint8_t status, ke_task_id_t dest_id);
+void scan_send_done_ind(uint8_t status, ke_task_id_t dest_id);
 #endif
 
 #if CFG_TX_EVM_TEST

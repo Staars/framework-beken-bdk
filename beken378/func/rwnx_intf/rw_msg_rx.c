@@ -31,6 +31,9 @@
 #include "rxu_task.h"
 #include "main_none.h"
 #include "sys_ctrl_pub.h"
+#include "ate_app.h"
+#include "scanu.h"
+#include "rwnx_defs.h"
 
 uint32_t resultful_scan_cfm = 0;
 uint8_t *ind_buf_ptr = 0;
@@ -42,11 +45,13 @@ SCAN_RST_UPLOAD_T *scan_rst_set_ptr = 0;
 #if CFG_WPA_CTRL_IFACE
 IND_CALLBACK_T scan_cfm_cb_user = {0};
 #endif
+
 #if !CFG_WPA_CTRL_IFACE
 IND_CALLBACK_T scan_cfm_cb[2] = {0};
 #else
 IND_CALLBACK_T scan_cfm_cb = {0};
 #endif
+
 IND_CALLBACK_T assoc_cfm_cb = {0};
 IND_CALLBACK_T deassoc_evt_cb = {0};
 IND_CALLBACK_T deauth_evt_cb = {0};
@@ -54,6 +59,7 @@ IND_CALLBACK_T wlan_connect_user_cb = {0};
 
 extern FUNC_1PARAM_PTR bk_wlan_get_status_cb(void);
 extern void app_set_sema(void);
+extern UINT32 sctrl_ctrl(UINT32 cmd, void *param);
 extern int get_security_type_from_ie(u8 *, int, u16);
 extern void rwnx_cal_set_txpwr(UINT32 pwr_gain, UINT32 grate);
 extern void bk7011_default_rxsens_setting(void);
@@ -303,8 +309,7 @@ void mhdr_scanu_reg_cb_handle(struct scanu_start_cfm *cfm)
 void mhdr_scanu_reg_cb(FUNC_2PARAM_PTR ind_cb, void *ctxt)
 {
 	int i;
-
-	for(i=0;i<(sizeof(scan_cfm_cb)/sizeof(IND_CALLBACK_T));i++)
+	for(i = 0;i<(sizeof(scan_cfm_cb)/sizeof(IND_CALLBACK_T));i++)
 	{
 		if((scan_cfm_cb[i].cb == ind_cb)
 			&&(scan_cfm_cb[i].ctxt_arg == ctxt))
@@ -313,7 +318,7 @@ void mhdr_scanu_reg_cb(FUNC_2PARAM_PTR ind_cb, void *ctxt)
 		}
 	}
 
-	for(i=0;i<(sizeof(scan_cfm_cb)/sizeof(IND_CALLBACK_T));i++)
+	for(i = 0;i<(sizeof(scan_cfm_cb)/sizeof(IND_CALLBACK_T));i++)
 	{
 		if(scan_cfm_cb[i].cb == NULL)
 		{
@@ -327,7 +332,6 @@ void mhdr_scanu_reg_cb(FUNC_2PARAM_PTR ind_cb, void *ctxt)
 void mhdr_scanu_reg_cb_clean(FUNC_2PARAM_PTR ind_cb, void *ctxt)
 {
 	int i;
-
 	for(i = 0; i < (sizeof(scan_cfm_cb)/sizeof(IND_CALLBACK_T)); i++){
 		if((scan_cfm_cb[i].cb == ind_cb)
 			||(scan_cfm_cb[i].ctxt_arg == ctxt)){
@@ -337,7 +341,6 @@ void mhdr_scanu_reg_cb_clean(FUNC_2PARAM_PTR ind_cb, void *ctxt)
 		}
 	}
 }
-
 
 void mhdr_scanu_reg_cb_handle(struct scanu_start_cfm *cfm)
 {
@@ -580,7 +583,7 @@ static void sort_scan_result(SCAN_RST_UPLOAD_T *ap_list)
     }
 }
 
-UINT32 mhdr_scanu_start_cfm(void *msg, SCAN_RST_UPLOAD_T *ap_list)
+UINT32 mhdr_scanu_start_cfm(void *msg, SCAN_RST_UPLOAD_T **ap_list)
 {
     struct scanu_start_cfm *cfm;
     struct ke_msg *msg_ptr;
@@ -588,16 +591,22 @@ UINT32 mhdr_scanu_start_cfm(void *msg, SCAN_RST_UPLOAD_T *ap_list)
     msg_ptr = (struct ke_msg *)msg;
     cfm = (struct scanu_start_cfm *)msg_ptr->param;
 
-    if(ap_list)
+    if(*ap_list)
     {
-        sort_scan_result(ap_list);
+    	if(CO_OK == cfm->status)
+    	{
+        	sort_scan_result(*ap_list);
+    	}
+		else
+		{
+			sr_flush_scan_results(*ap_list);
+		}
     }
 
 	mhdr_scanu_reg_cb_handle(cfm);
 
     return RW_SUCCESS;
 }
-
 
 UINT32 mhdr_scanu_result_ind(SCAN_RST_UPLOAD_T *scan_rst, void *msg, UINT32 len)
 {
@@ -732,8 +741,20 @@ scan_rst_exit:
     return ret;
 }
 
+int rwnx_get_noht_rssi_thresold(void)
+{
+	if (get_ate_mode_state())
+	{
+		/* keep HT in ATE mode */
+		return -128; /* MIN_INT8=0x80=-128 */
+	}
+
+	return DIS_HT_SCAN_RST_RSSI_THRED;
+}
+
 void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 {
+	UINT32 reg;
 	uint32_t param;
 	FUNC_1PARAM_PTR fn = bk_wlan_get_status_cb();
 
@@ -742,8 +763,9 @@ void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 	/**************************************************************************/
 	/*                          scan_hdlrs                                    */
 	/**************************************************************************/
-	case SCANU_START_CFM:
-		/* scan complete */
+	case SCANU_START_CFM:/* scan complete */
+        reg = RF_HOLD_BY_SCAN_BIT;
+
 #if CFG_ROLE_LAUNCH
 		rl_pre_sta_set_status(RL_STATUS_STA_SCAN_OVER);
 #endif
@@ -753,9 +775,8 @@ void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 			resultful_scan_cfm = 1;
 		}
 
-		mhdr_scanu_start_cfm(rx_msg, scan_rst_set_ptr);
-        UINT32 reg = RF_HOLD_BY_SCAN_BIT;
-        sddev_control(SCTRL_DEV_NAME, CMD_RF_HOLD_BIT_CLR, &reg);
+		mhdr_scanu_start_cfm(rx_msg, &scan_rst_set_ptr);
+        sctrl_ctrl(CMD_RF_HOLD_BIT_CLR, &reg);
 		break;
 
 	case SCANU_RESULT_IND:
@@ -781,7 +802,6 @@ void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 		else{
 				mhdr_scanu_result_ind(scan_rst_set_ptr, rx_msg, rx_msg->param_len);
 		}
-
 		break;
 
 		/**************************************************************************/
@@ -801,8 +821,8 @@ void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 #else /* !CONFIG_SME*/
 	case SM_CONNECT_IND:
 		/* connect indication */
-		if (scan_rst_set_ptr) {
-			sr_release_scan_results(scan_rst_set_ptr);
+		if (resultful_scan_cfm && scan_rst_set_ptr) {
+			sr_flush_scan_results(scan_rst_set_ptr);
 
 			scan_rst_set_ptr = 0;
 			resultful_scan_cfm = 0;
@@ -988,18 +1008,42 @@ void rwnx_handle_recv_msg(struct ke_msg *rx_msg)
 	/**************************************************************************/
 	/*							mm_hdlrs									  */
 	/**************************************************************************/
-	case MM_CHANNEL_SWITCH_IND:
-		break;
+#if CFG_WIFI_P2P
+	case MM_CHANNEL_SWITCH_IND: {
+		struct ke_msg *msg_ptr;
+		struct mm_channel_switch_ind *ind;
+
+		msg_ptr = (struct ke_msg *)rx_msg;
+		ind = (struct mm_channel_switch_ind *)msg_ptr->param;
+		if (ind->roc)
+			wpa_ctrl_event_copy(WPA_CTRL_EVENT_REMAIN_ON_CHANNEL, ind, sizeof(*ind));
+	}	break;
 	case MM_CHANNEL_PRE_SWITCH_IND:
+		/*
+		 * Host should stop pushing packets for transmission after reception
+		 * of this message.
+		 */
 		break;
-	case MM_REMAIN_ON_CHANNEL_EXP_IND:
-		break;
-	case MM_PS_CHANGE_IND:
-		break;
+	case MM_REMAIN_ON_CHANNEL_EXP_IND: {
+		struct rwnx_hw *rwnx_hw = &g_rwnx_hw;
+		struct rwnx_roc_elem *roc_elem = rwnx_hw->roc_elem;
+
+		if (roc_elem) {
+			wpa_ctrl_request_async(WPA_CTRL_EVENT_CANCEL_REMAIN_ON_CHANNEL, NULL);
+			os_free(roc_elem);
+		}
+		rwnx_hw->roc_elem = 0;
+	}	break;
+#endif
+	//case MM_PS_CHANGE_IND:
+	//	break;
 	case MM_TRAFFIC_REQ_IND:
 		break;
+#if CFG_USE_P2P_PS
 	case MM_P2P_VIF_PS_CHANGE_IND:
+	    rwm_p2p_ps_change_ind_handler(rx_msg);
 		break;
+#endif
 	case MM_CSA_COUNTER_IND:
 		break;
 	case MM_CSA_FINISH_IND:

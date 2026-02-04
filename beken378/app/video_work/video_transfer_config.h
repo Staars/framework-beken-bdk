@@ -22,8 +22,13 @@
 #define APP_DEMO_CFG_USE_TCP              1
 #define APP_DEMO_CFG_USE_UDP              1
 #define APP_DEMO_CFG_USE_VIDEO_BUFFER     1
+#define APP_DEMO_CFG_USE_UDP_SDP          1
 
 #define SUPPORT_TIANZHIHENG_DRONE         0
+
+// UDP_SDP_CONFIG
+#define UDP_SDP_LOCAL_PORT               (10000)
+#define UDP_SDP_REMOTE_PORT              (52110)
 
 #if SUPPORT_TIANZHIHENG_DRONE
 #define APP_DEMO_UDP_CMD_PORT             8090

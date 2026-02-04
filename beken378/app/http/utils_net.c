@@ -10,8 +10,8 @@
 #include "mem_pub.h"
 #include "time.h"
 #include "iot_export_errno.h"
-#if CFG_SUPPORT_OTA_HTTP
 
+#if CFG_SUPPORT_OTA_HTTP
 uintptr_t HAL_TCP_Establish(const char *host, uint16_t port)
 {
     struct addrinfo hints;

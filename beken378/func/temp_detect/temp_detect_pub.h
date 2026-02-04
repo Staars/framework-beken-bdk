@@ -14,6 +14,9 @@
 
 #if (CFG_SOC_NAME == SOC_BK7221U)
 #define ADC_TEMP_SENSER_CHANNEL                     8
+#elif (CFG_SOC_NAME == SOC_BK7231N)
+#define ADC_VOLT_SENSER_CHANNEL                     0
+#define ADC_TEMP_SENSER_CHANNEL                     7
 #elif(CFG_SOC_NAME == SOC_BK7271)
 #define ADC_TEMP_SENSER_CHANNEL                     0
 #else
@@ -35,7 +38,7 @@
 #if (CFG_SOC_NAME == SOC_BK7231)
 #define ADC_TMEP_LSB_PER_10DEGREE                   (24)
 #elif (CFG_SOC_NAME == SOC_BK7231N) || (CFG_SOC_NAME == SOC_BK7236)
-#define ADC_TMEP_LSB_PER_10DEGREE                   (20)
+#define ADC_TMEP_LSB_PER_10DEGREE                   (18)
 #else
 #define ADC_TMEP_LSB_PER_10DEGREE                   (12)// 7231:24,7231U:22,
 #endif
@@ -48,7 +51,7 @@
 /*******************************************************************************
 * Function Declarations
 *******************************************************************************/
-#if CFG_USE_TEMPERATURE_DETECT
+#if CFG_USE_TEMPERATURE_DETECT || CFG_USE_VOLTAGE_DETECT
 void temp_detect_change_configuration(UINT32 intval, UINT32 thre, UINT32 dist);
 UINT32 temp_detect_init(UINT32 init_val);
 UINT32 temp_detect_uninit(void);
@@ -60,6 +63,8 @@ UINT32 temp_detect_is_init(void);
 #endif
 
 UINT32 temp_single_get_current_temperature(UINT32 *temp_value);
+UINT32 volt_single_get_current_voltage(UINT32 *volt_value);
+
 #endif
 // eof
 

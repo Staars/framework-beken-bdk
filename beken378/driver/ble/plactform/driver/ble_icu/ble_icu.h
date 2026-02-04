@@ -18,8 +18,7 @@
 #define MCU_CLK_96MHz       96000000
 #define MCU_CLK_120MHz      120000000
 
-#define MCU_CLK            MCU_CLK_26MHz// MCU_CLK_120MHz
-
+#define MCU_CLK            MCU_CLK_26MHz
 
 #define PER_CLK_32KHz       32000
 #define PER_CLK_16MHz       16000000
@@ -30,33 +29,14 @@
 
 #define PER_CLK             PER_CLK_26MHz
 
-
-
-
-
-
-
-
-
-
-
 void ble_sleep(void);
-
 void ble_icu_init(void);
-
 void cpu_reduce_voltage_sleep(void);
-
 void cpu_idle_sleep(void);
-
 void cpu_wakeup(void);
-
 void mcu_clk_config(void);
-
 void udi_wdt_enable(uint16_t wdt_cnt);
-
 void switch_clk(uint8_t clk);
-
 void bk3435_singleWaveCfg(uint8_t freq, uint8_t power_level);
-
 #endif
 

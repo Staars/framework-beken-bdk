@@ -100,6 +100,9 @@ struct hostapd_ssid {
 
 	struct hostapd_wpa_psk *wpa_psk;
 	char *wpa_passphrase;
+#if CFG_WIFI_P2P_GO
+	char *wpa_psk_file;
+#endif
 
 	struct hostapd_wep_keys wep;
 
@@ -269,18 +272,20 @@ struct hostapd_bss_config {
 	int max_num_sta; /* maximum number of STAs in station table */
 
 	int dtim_period;
-#ifdef CONFIG_FULL_HOSTAPD
+#if CFG_WIFI_P2P_GO
 	unsigned int bss_load_update_period;
 	unsigned int chan_util_avg_period;
 #endif
 
 	int ieee802_1x; /* use IEEE 802.1X */
 	int eapol_version;
-#ifdef CONFIG_FULL_HOSTAPD
 	int eap_server; /* Use internal EAP server instead of external
 			 * RADIUS server */
+#if CFG_WIFI_P2P_GO
 	struct hostapd_eap_user *eap_user;
 	char *eap_user_sqlite;
+#endif
+#ifdef CONFIG_FULL_HOSTAPD
 	char *eap_sim_db;
 	unsigned int eap_sim_db_timeout;
 	int eap_server_erp; /* Whether ERP is enabled on internal EAP server */
@@ -321,7 +326,9 @@ struct hostapd_bss_config {
 	int ieee802_11f; /* use IEEE 802.11f (IAPP) */
 	char iapp_iface[IFNAMSIZ + 1]; /* interface used with IAPP broadcast
 					* frames */
+#endif
 
+#ifdef CONFIG_P2P
 	enum macaddr_acl {
 		ACCEPT_UNLESS_DENIED = 0,
 		DENY_UNLESS_ACCEPTED = 1,
@@ -397,6 +404,9 @@ struct hostapd_bss_config {
 #endif /* CONFIG_NATIVE_WINDOWS */
 	int ctrl_interface_gid_set;
 #endif
+#ifdef CONFIG_P2P
+	int fragment_size;
+#endif
 
 	int use_pae_group_addr; /* Whether to send EAPOL frames to PAE group
 				 * address instead of individual address
@@ -425,6 +435,42 @@ struct hostapd_bss_config {
 	int okc; /* Opportunistic Key Caching */
 
 	int wps_state;
+#ifdef CONFIG_WPS
+	int wps_independent;
+	int ap_setup_locked;
+	u8 uuid[16];
+	char *wps_pin_requests;
+	char *device_name;
+	char *manufacturer;
+	char *model_name;
+	char *model_number;
+	char *serial_number;
+	u8 device_type[WPS_DEV_TYPE_LEN];
+	char *config_methods;
+	u8 os_version[4];
+	char *ap_pin;
+	int skip_cred_build;
+	u8 *extra_cred;
+	size_t extra_cred_len;
+	int wps_cred_processing;
+	int wps_cred_add_sae;
+	int force_per_enrollee_psk;
+	u8 *ap_settings;
+	size_t ap_settings_len;
+	struct hostapd_ssid multi_ap_backhaul_ssid;
+	char *upnp_iface;
+	char *friendly_name;
+	char *manufacturer_url;
+	char *model_description;
+	char *model_url;
+	char *upc;
+	struct wpabuf *wps_vendor_ext[MAX_WPS_VENDOR_EXTENSIONS];
+	int wps_nfc_pw_from_config;
+	int wps_nfc_dev_pw_id;
+	struct wpabuf *wps_nfc_dh_pubkey;
+	struct wpabuf *wps_nfc_dh_privkey;
+	struct wpabuf *wps_nfc_dev_pw;
+#endif /* CONFIG_WPS */
 	int pbc_in_m1;
 	char *server_id;
 
@@ -512,7 +558,7 @@ struct hostapd_bss_config {
 	char *no_probe_resp_if_seen_on;
 	char *no_auth_if_seen_on;
 
-#ifdef CONFIG_FULL_HOSTAPD
+#ifdef CONFIG_P2P
 	int pbss;
 #endif
 
@@ -556,7 +602,7 @@ struct hostapd_bss_config {
 
 	int coloc_intf_reporting;
 
-#ifdef CONFIG_FULL_HOSTAPD
+#if CFG_WIFI_P2P_GO
 #define BACKHAUL_BSS 1
 #define FRONTHAUL_BSS 2
 	int multi_ap; /* bitmap of BACKHAUL_BSS, FRONTHAUL_BSS */

@@ -181,7 +181,11 @@ static void bk_spi_configure(UINT32 rate, UINT32 mode)
 	sddev_control(SPI_DEV_NAME, CMD_SPI_SET_MSTEN, (void *)&param);
 
 	// 4line :7231N nssms is 0
+#if (SPI_LINE_MODE == SPI_USE_4_LINE)
 	param = 0;
+#else
+	param = 1;
+#endif
 	sddev_control(SPI_DEV_NAME, CMD_SPI_SET_NSSMD, (void *)&param);
 
 	param = 0;
@@ -515,9 +519,6 @@ void bk_spi_master_dma_config(UINT32 mode, UINT32 rate)
 	sddev_control(SPI_DEV_NAME, CMD_SPI_TXOVR_EN, (void *)&param);
 
 	param = 0;
-	sddev_control(SPI_DEV_NAME, CMD_SPI_SET_NSSMD, (void *)&param);
-
-	param = 0;
 	sddev_control(SPI_DEV_NAME, CMD_SPI_SET_BITWIDTH, (void *)&param);
 
 	//disable CSN intterrupt
@@ -754,7 +755,101 @@ int bk_spi_dma_transfer(UINT32 mode, struct spi_message *spi_msg)
 	return ret;
 }
 
+#if CFG_SUPPORT_SPI_TEST
 
+#define SPI_DMA_TX_LOOP_TEST_LEN    2000
+
+void spi_tx_loop_test(void *arg)
+{
+	struct spi_message	msg;
+
+	UINT8 *buf;
+	int tx_len, ret;
+	int cnt = 0;
+
+	tx_len = SPI_DMA_TX_LOOP_TEST_LEN;
+
+	BK_SPI_PRT("spi dma tx: tx_len:%d\n", tx_len);
+
+	buf = os_malloc(tx_len * sizeof(UINT8));
+	if (!buf) {
+		bk_printf("buf malloc fail\r\n");
+		return;
+	}
+
+	os_memset(buf, 0, tx_len);
+
+	for (int i = 0; i < tx_len; i++)
+		buf[i] = i + 0x60;
+
+	msg.send_buf = buf;
+	msg.send_len = tx_len;
+	msg.recv_buf = NULL;
+	msg.recv_len = 0;
+
+
+	UINT32 mode = SPI_MODE_0 | SPI_MSB | SPI_MASTER;
+	UINT32 max_hz = 8 * 1000 * 1000;
+
+	bk_spi_dma_init(mode, max_hz, &msg);
+
+	while (1) {
+		if (cnt >= 0x1000)
+			break;
+
+		ret = bk_spi_dma_transfer(mode,&msg);
+		if (ret) {
+			bk_printf("spi dma send error%d\r\n", ret);
+			break;
+		}
+
+		if(cnt%100 == 0) {
+			bk_printf("tx success cnt :%d\r\n", cnt);
+		}
+		cnt ++;
+		rtos_delay_milliseconds(50);
+	}
+
+}
+
+
+beken_thread_t spi_dma_master_tx_thread_handle ;
+uint32 spi_dma_master_tx_thread_main(void)
+{
+	int ret;
+
+	ret = rtos_create_thread(&spi_dma_master_tx_thread_handle,
+							 BEKEN_DEFAULT_WORKER_PRIORITY,
+							 "spidma",
+							 (beken_thread_function_t)spi_tx_loop_test,
+							 4096,
+							 (beken_thread_arg_t)0);
+	if (ret != kNoErr) {
+		bk_printf("Error: spi dma master tx stop: %d\r\n", ret);
+		goto init_err;
+	}
+
+	return kNoErr;
+
+init_err:
+	return kGeneralErr;
+}
+
+uint32 spi_dma_master_tx_loop_stop(void)
+{
+	int ret;
+
+	ret = rtos_delete_thread(&spi_dma_master_tx_thread_handle);
+	if (ret != kNoErr) {
+		bk_printf("Error: spi dma master tx stop: %d\r\n", ret);
+	}
+
+	bk_spi_master_deinit();
+
+	return kNoErr;
+}
+
+#endif
 #endif  //CFG_USE_SPI_DMA
 #endif  // CFG_USE_SPI_MASTER
 #endif  //(CFG_SOC_NAME == SOC_BK7231N)

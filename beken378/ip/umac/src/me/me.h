@@ -86,6 +86,11 @@ struct me_env_tag
     /// Boolean indicating if PS mode shall be enabled or not
     bool ps_on;
 #endif
+
+#if NX_P2P
+    /// VIF index of apm active req
+    uint8_t apm_active_vif_idx;
+#endif
 };
 
 /// Mobility Domain IE

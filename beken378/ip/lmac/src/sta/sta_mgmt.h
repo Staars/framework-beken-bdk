@@ -163,7 +163,7 @@ struct sta_pol_tbl_cntl
 {
     /// Pointer to the buffer control structures
     struct txl_buffer_control *buf_ctrl[2];
-	
+
     #if RC_ENABLE
     /// Pointer to the rate control algorithm structure
     struct rc_sta_stats *sta_stats;
@@ -282,8 +282,9 @@ struct sta_info_tag
     uint16_t seq_nbr[TID_MAX];
     /// TX policy table control
     struct sta_pol_tbl_cntl pol_tbl;
-	
+
 	uint32_t pre_rx_timepoint;
+	int8_t   rssi;
 
     #if (NX_AMPDU_TX)
     /// For TX BA agreements per TID
@@ -604,7 +605,7 @@ __INLINE bool sta_mgmt_is_valid(uint8_t sta_idx)
 {
 	if (sta_idx >= STA_MAX)
 		return false;
-	
+
 	return (sta_info_tab[sta_idx].valid);
 }
 

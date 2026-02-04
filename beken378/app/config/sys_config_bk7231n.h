@@ -13,6 +13,28 @@
 #define CFG_IEEE80211N                             1
 
 /*section 1-----OS macro config-----*/
+#define RTOS_ALIOS_THINGS                          1
+#define RTOS_RT_THREAD                             2
+#define RTOS_FREERTOS                              3
+#define RTOS_LITEOS                                4
+
+/* CFG_OS_FREERTOS----RTOS_FREERTOS
+   CFG_SUPPORT_RTT----RTOS_RT_THREAD
+   CFG_SUPPORT_LITEOS--RTOS_LITEOS
+   CFG_SUPPORT_ALIOS---RTOS_ALIOS_THINGS
+ */
+#define CFG_SUPPORT_RTOS                           RTOS_FREERTOS
+
+#define FREERTOS_V9                                1
+#define FREERTOS_V10                               2
+#define CFG_FREERTOS_VER                           FREERTOS_V9
+
+#define ENC_METHOD_NULL                        1
+#define ENC_METHOD_XOR                         2
+#define ENC_METHOD_AES                         3
+
+#define FAST_CONNECT_INFO_ENC_METHOD               ENC_METHOD_NULL
+
 #define THD_APPLICATION_PRIORITY                   3
 #define THD_CORE_PRIORITY                          2
 #define THD_UMP3_PRIORITY                          4
@@ -35,6 +57,14 @@
 #define CFG_WPA_CTRL_IFACE                         1
 #define CFG_RWNX_QOS_MSDU                          1
 #define CFG_WLAN_FAST_CONNECT                      0
+#define CFG_WPA2_ENTERPRISE                        0
+#define CFG_WPA3_ENTERPRISE                        0
+/* WPS(WSC) Support */
+#define CFG_WIFI_WPS                               0
+/* WiFi Direct Support, CFG_WIFI_WPS must be enabled */
+#define CFG_WIFI_P2P                               0
+#define CFG_WIFI_P2P_GO                            0
+
 /* PMF */
 #define CFG_IEEE80211W                             0
 #if CFG_WPA_CTRL_IFACE
@@ -47,6 +77,7 @@
 #define CFG_USE_WPA_29                             1
 #undef CFG_IEEE80211W
 #define CFG_IEEE80211W                             1
+#define CFG_OWE                                    0
 #endif
 #define CFG_WFA_CERT                               0
 #define CFG_ENABLE_BUTTON                          0
@@ -54,15 +85,18 @@
 #define CFG_EASY_FLASH                             0
 #define CFG_AP_SUPPORT_HT_IE                       0
 #define CFG_SUPPORT_BSSID_CONNECT                  0
+#define CFG_USE_CONV_UTF8                          0
 #define CFG_BK_AWARE                               0
 #define CFG_BK_AWARE_OUI                           "\xC8\x47\x8C"
 
 /*section 3-----driver macro config-----*/
 #define CFG_MAC_PHY_BAPASS                         1
+#define CFG_SUPPORT_SARADC                         1
 
 #define CFG_SDIO                                   0
 #define CFG_SDIO_TRANS                             0
 #define CFG_REAL_SDIO                              0
+
 #if CFG_REAL_SDIO
 #define FOR_SDIO_BLK_512                           0
 #endif
@@ -83,8 +117,6 @@
 
 /*section 4-----DEBUG macro config-----*/
 #define CFG_UART_DEBUG                             0
-#define CFG_UART_DEBUG_COMMAND_LINE                1
-#define CFG_BACKGROUND_PRINT                       0
 #define CFG_SUPPORT_BKREG                          1
 #define CFG_ENABLE_WPA_LOG                         0
 #define CFG_IPERF_TEST                             0
@@ -99,9 +131,9 @@
 #define CFG_WIFI_RAW_TX_CMD                        0
 
 #define ASSERT_HALT                       1
-#define ASSERT_IGNORE                   2
-#define ASSERT_REBOOT                   3
-#define CFG_ASSERT_OPTION           ASSERT_IGNORE
+#define ASSERT_IGNORE                     2
+#define ASSERT_REBOOT                     3
+#define CFG_ASSERT_OPTION                 ASSERT_IGNORE
 
 /*section 5-----PRODUCT macro config-----*/
 #define CFG_RELEASE_FIRMWARE                       0
@@ -117,6 +149,10 @@
 #define SOC_BK7271                                 4
 #define SOC_BK7231N                                5
 #define CFG_SOC_NAME                               SOC_BK7231N
+
+#if ((SOC_BK7231N == CFG_SOC_NAME) && CFG_JTAG_ENABLE && CFG_SUPPORT_SARADC)
+#error "jtag and saradc are using the same gpio"
+#endif
 
 /*section 7-----calibration*/
 #if (CFG_RUNNING_PLATFORM == FPGA_PLATFORM)
@@ -137,6 +173,7 @@
 
 /*section 11-----temperature detect*/
 #define CFG_USE_TEMPERATURE_DETECT                 1
+#define CFG_USE_VOLTAGE_DETECT                     0
 
 /*section 12-----for SPIDMA interface*/
 #define CFG_USE_SPIDMA                             0
@@ -180,7 +217,7 @@
 #define CFG_SUPPORT_OTA_TFTP                       0
 
 /*section 22 ----- support adc calibrate*/
-#define CFG_SARADC_CALIBRATE                       0
+#define CFG_SARADC_CALIBRATE                       1
 
 /*section 23 ----- support reduce nomal power*/
 #define CFG_SYS_REDUCE_NORMAL_POWER                0
@@ -203,6 +240,10 @@
 #define CFG_SUPPORT_BLE                            1
 #define CFG_SUPPORT_BLE_MESH                       0
 #define CFG_USE_PTA                                0
+
+#if ((0 == CFG_SUPPORT_BLE) && (CFG_USE_BLE_PS))
+#error "check the ble macro, thx!"
+#endif
 
 #define BLE_VERSION_4_2                            1
 #define BLE_VERSION_5_x                            2
@@ -229,9 +270,6 @@
 #error "CONN NUM should not be 0"
 #endif
 
-
-#define CFG_SUPPOET_BSSID_CONNECT                  0
-
 #define CFG_XTAL_FREQUENCE_40M                     40000000 //40MHz
 #define CFG_XTAL_FREQUENCE_26M                     26000000 //26MHz
 #if (CFG_SOC_NAME == SOC_BK7231N)
@@ -239,6 +277,7 @@
 #else
 #define CFG_XTAL_FREQUENCE                         CFG_XTAL_FREQUENCE_26M
 #endif
+#define CFG_XTAL_85DEGREE                          0
 
 #if (CFG_SUPPORT_ALIOS)
 #undef  CFG_JTAG_ENABLE
@@ -258,6 +297,11 @@
 #define CFG_LWIP_MEM_POLICY                       LWIP_REDUCE_THE_PLAN
 #endif
 
+#define FLASH_SELECTION_TYPE_DYNAMIC               0 //select with flashID runtime
+#define FLASH_SELECTION_TYPE_2M                    0x200000 //2MBytes
+#define FLASH_SELECTION_TYPE_4M                    0x400000 //4MBytes
+#define FLASH_SELECTION_TYPE_8M                    0x800000 //8MBytes
+#define CFG_FLASH_SELECTION_TYPE                   FLASH_SELECTION_TYPE_2M
 
 /* watchdog, freertos only */
 #define CFG_INT_WDG_ENABLED                        1

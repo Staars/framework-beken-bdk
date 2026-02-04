@@ -287,14 +287,14 @@ static void spi_slave_set_cs_finish_interrupt(UINT32 enable)
     
     // don't clean cs finish status
     value &= ~(SPI_S_CS_UP_INT_STATUS);
-    
+
     REG_WRITE(SPI_SLAVE_CTRL, value);
 }
 
-static void spi_gpio_configuration(void)
+void spi_gpio_configuration(void)
 {
 	uint32_t val;
-	
+
 #if (USE_SPI_GPIO_NUM == USE_SPI_GPIO_14_17)
 		val = GFUNC_MODE_SPI;
 #elif (USE_SPI_GPIO_NUM == USE_SPI_GPIO_30_33)
@@ -338,8 +338,6 @@ static void spi_init_msten(UINT8 param)
 	value &= ~((TXINT_MODE_MASK << TXINT_MODE_POSI) | (RXINT_MODE_MASK << RXINT_MODE_POSI));
 	value |= RXOVR_EN
 		  | TXOVR_EN
-		//| RXINT_EN
-		//| TXINT_EN
 		  | (0x3UL << RXINT_MODE_POSI)   // has 1byte 
 		  | (0x3UL << TXINT_MODE_POSI);	// 12byte left
 

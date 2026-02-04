@@ -5,7 +5,7 @@
 
 #define FS_PRT                   os_null_printf
 #define FS_WARN                  os_null_printf
-#define FS_FATAL                 os_null_printf
+#define FS_FATAL                 bk_printf
 
 typedef struct mac_sleep_ctrl {
 	uint8_t off_mac;

@@ -38,7 +38,7 @@
 #include "txu_cntrl.h"
 #include "power_save.h"
 
-#if (CFG_OS_FREERTOS)
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT) || (CFG_SUPPORT_LITEOS)
 #include "wlan_cli_pub.h"
 #endif
 
@@ -48,6 +48,10 @@
 #include "ap_idle_pub.h"
 #include "arbitrate.h"
 #include "ke_event.h"
+
+#if CFG_TX_BUFING
+#include "rw_tx_buffering.h"
+#endif
 
 beken_thread_t  init_thread_handle;
 beken_thread_t  app_thread_handle;
@@ -166,7 +170,6 @@ tx_handler_exit:
     pbuf_free(q);
 }
 
-
 void bmsg_tx_raw_cb_handler(BUS_MSG_T *msg)
 {
 	rwm_raw_frame_with_cb((uint8_t *)msg->arg, msg->len, msg->cb, msg->param);
@@ -174,19 +177,23 @@ void bmsg_tx_raw_cb_handler(BUS_MSG_T *msg)
 
 int bmsg_tx_raw_cb_sender(uint8_t *buffer, int length, void *cb, void *param)
 {
+	void *node;
 	OSStatus ret;
 	BUS_MSG_T msg;
 
 	msg.type = BMSG_TX_RAW_CB_TYPE;
-	msg.arg = (uint32_t)buffer;
 	msg.len = length;
 	msg.sema = NULL;
 	msg.cb = cb;
 	msg.param = param;
 
-	ret = rtos_push_to_queue(&g_wifi_core.io_queue, &msg, 1*SECONDS);
-	if(ret != kNoErr)
-	{
+	/*alloc new buffer, and copy the content*/
+	node = (void *)rwm_raw_frame_prepare_space(buffer, length);
+	msg.arg = (uint32_t)node;
+
+	ret = rtos_push_to_queue(&g_wifi_core.io_queue, &msg, 1 * SECONDS);
+	if (ret != kNoErr) {
+		rwm_raw_frame_destroy_space(node);
 		APP_PRT("bmsg_tx_sender failed\r\n");
 	}
 
@@ -205,6 +212,7 @@ void bmsg_tx_raw_handler(BUS_MSG_T *msg)
 
 	node = rwm_tx_node_alloc(len);
 	if (node == NULL) {
+		os_printf("rwm_tx_node_alloc failed\r\n");
 		goto exit;
 	}
 
@@ -214,6 +222,7 @@ void bmsg_tx_raw_handler(BUS_MSG_T *msg)
 	txdesc_new = tx_txdesc_prepare(queue_idx);
 	if(txdesc_new == NULL || TXDESC_STA_USED == txdesc_new->status) {
 		rwm_node_free(node);
+		os_printf("bmsg_tx_raw_handler failed\r\n");
 		goto exit;
 	}
 
@@ -371,7 +380,8 @@ void bmsg_null_sender(void)
     msg.len = 0;
     msg.sema = NULL;
 
-    if(!rtos_is_queue_empty(&g_wifi_core.io_queue))
+    if((0 == g_wifi_core.io_queue) 
+		|| !rtos_is_queue_empty(&g_wifi_core.io_queue))
     {
         return;
     }
@@ -435,19 +445,23 @@ int bmsg_tx_sender(struct pbuf *p, uint32_t vif_idx)
 int bmsg_tx_raw_sender(uint8_t *payload, uint16_t length)
 {
 	OSStatus ret;
-	BUS_MSG_T msg;
+	BUS_MSG_T msg = {0};
+	void *node;
 
-	msg.type = BMSG_TX_RAW_TYPE;
-	msg.arg = (uint32_t)payload;
+	msg.type = BMSG_TX_RAW_CB_TYPE;
 	msg.len = length;
-	msg.sema = NULL;
 
-	ret = rtos_push_to_queue(&g_wifi_core.io_queue, &msg, 1*SECONDS);
+	/*alloc new buffer, and copy the content*/
+	node = (void *)rwm_raw_frame_prepare_space(payload, length);
+	msg.arg = (uint32_t)node;
 
-	if(ret != kNoErr)
-	{
-		APP_PRT("bmsg_tx_sender failed\r\n");
+	if (payload)
 		os_free(payload);
+
+	ret = rtos_push_to_queue(&g_wifi_core.io_queue, &msg, 1 * SECONDS);
+	if (ret != kNoErr) {
+		rwm_raw_frame_destroy_space(node);
+		APP_PRT("bmsg_tx_sender failed\r\n");
 	}
 
 	return ret;
@@ -511,14 +525,15 @@ void bmsg_music_sender(void *arg)
     }
 }
 
-#if CFG_USE_AP_PS
-void bmsg_txing_sender(uint8_t sta_idx)
+
+#if CFG_TX_BUFING
+void bmsg_tx_bufing_sender(uint32_t cid_and_flag)
 {
     OSStatus ret;
     BUS_MSG_T msg;
 
-    msg.type = BMSG_TXING_TYPE;
-    msg.arg = (uint32_t)sta_idx;
+    msg.type = BMSG_TX_BUFING_TYPE;
+    msg.arg =  cid_and_flag;
     msg.len = 0;
     msg.sema = NULL;
 
@@ -529,12 +544,11 @@ void bmsg_txing_sender(uint8_t sta_idx)
     }
 }
 
-void bmsg_txing_handler(BUS_MSG_T *msg)
+void bmsg_tx_bufing_handler(BUS_MSG_T *msg)
 {
-    OSStatus ret;
-    UINT8 sta_idx = (UINT8)msg->arg;
+    uint32_t cid_and_flag = msg->arg;
 
-    rwm_msdu_send_txing_node(sta_idx);
+    rwm_tx_bufing_restore_data(cid_and_flag);
 }
 #endif
 
@@ -623,9 +637,9 @@ static void core_thread_main( void *arg )
                 bmsg_music_handler(&msg);
                 break;
 
-#if CFG_USE_AP_PS
-            case BMSG_TXING_TYPE:
-                bmsg_txing_handler(&msg);
+#if CFG_TX_BUFING
+            case BMSG_TX_BUFING_TYPE:
+                bmsg_tx_bufing_handler(&msg);
                 break;
 #endif
 
@@ -787,7 +801,7 @@ void app_start(void)
 {
     app_pre_start();
 
-#if (CFG_OS_FREERTOS)
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_LITEOS)
     cli_init();
 #endif
 

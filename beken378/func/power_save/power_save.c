@@ -20,6 +20,7 @@
 #include "mcu_ps_pub.h"
 #include "error.h"
 #include "start_type_pub.h"
+#include "rtos_pub.h"
 
 #if CFG_SUPPORT_BLE
 #include "ble_pub.h"
@@ -203,7 +204,9 @@ bool power_save_sleep ( void )
 #if PS_USE_KEEP_TIMER
 
 	if ( 1 == ps_keep_timer_status ) {
+		rtos_lock_scheduling();
 		bmsg_ps_sender ( PS_BMSG_IOCTL_RF_KP_STOP );
+		rtos_unlock_scheduling();
 	}
 
 #endif
@@ -347,10 +350,6 @@ void power_save_wakeup ( void )
 	PS_DEBUG_UP_TRIGER;
 	ASSERT ( !ps_lock );
 	ps_lock ++;
-
-#if CFG_SUPPORT_BLE
-	ps_recover_ble_switch_mac_status();
-#endif
 }
 
 void power_save_dtim_exit_check()
@@ -400,6 +399,12 @@ void power_save_ieee_dtim_wakeup ( void )
 		ke_evt_set ( KE_EVT_MM_TIMER_BIT );
 		power_save_dtim_exit_check();
 	}
+
+#if CFG_SUPPORT_BLE
+	if(!power_save_if_rf_sleep()){
+		ps_recover_ble_switch_mac_status();
+	}
+#endif
 }
 
 
@@ -757,7 +762,7 @@ void power_save_rf_dtim_manual_do_wakeup ( void )
 		return;
 	}
 #endif
-
+	rtos_lock_scheduling();
 	PS_DEBUG_UP_TRIGER;
 
 	if ( ( bk_ps_mode == PS_DTIM_PS_MODE )
@@ -781,6 +786,7 @@ void power_save_rf_dtim_manual_do_wakeup ( void )
 		PS_PRT ( "m_r_u\r\n" );
 	}
 
+	rtos_unlock_scheduling();
 	GLOBAL_INT_RESTORE();
 }
 
@@ -1045,12 +1051,14 @@ void power_save_rf_ps_wkup_semlist_set ( void )
 {
 	UINT32 ret;
 
+	rtos_lock_scheduling();
 	while ( !co_list_is_empty ( &bk_ps_info.wk_list ) ) {
 		PS_DO_WKUP_SEM *sem_list;
 		sem_list = list2sem ( co_list_pop_front ( &bk_ps_info.wk_list ) );
 		ret = rtos_set_semaphore ( &sem_list->wkup_sema );
 		ASSERT ( 0 == ret );
 	}
+	rtos_unlock_scheduling();
 }
 
 void power_save_beacon_state_set ( PS_STA_BEACON_STATE state )

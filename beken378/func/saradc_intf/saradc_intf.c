@@ -412,10 +412,8 @@ create_exit:
 static void adc_check(int argc, char **argv)
 {
     UINT32 status, ret;
-    DD_HANDLE flash_handle;
     DD_HANDLE saradc_handle;
     saradc_cal_val_t p_ADC_cal;
-    float voltage = 0.0;
     saradc_desc_t *p_ADC_drv_desc = NULL;
     GLOBAL_INT_DECLARATION();
 

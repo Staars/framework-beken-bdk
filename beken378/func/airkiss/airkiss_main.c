@@ -18,6 +18,7 @@
 #if CFG_ROLE_LAUNCH
 #include "role_launch.h"
 #endif
+
 static airkiss_context_t *ak_contex = NULL;
 const airkiss_config_t ak_conf =
 {
@@ -29,7 +30,7 @@ const airkiss_config_t ak_conf =
 
 beken_timer_t ak_chan_timer;
 beken_timer_t ak_doing_timer;
-xTaskHandle  ak_thread_handle = NULL;
+beken_thread_t  ak_thread_handle = NULL;
 beken_semaphore_t ak_semaphore = NULL;
 beken_semaphore_t ak_connect_semaphore = NULL;
 airkiss_channel_t g_chans;
@@ -392,7 +393,7 @@ void airkiss_start_udp_boardcast(u8 random_data)
     while(i--)
     {
         err = sendto(udp_broadcast_fd, &random_data, 1, 0, (struct sockaddr *)&remote_skt, sizeof(remote_skt));
-        vTaskDelay(2);
+        rtos_thread_msleep(20);
         if(err == -1)
         {
             AIRKISS_WARN("send udp boardcast failed\r\n");

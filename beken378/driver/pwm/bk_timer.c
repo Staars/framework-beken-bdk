@@ -85,7 +85,7 @@ static UINT32 init_timer_param(timer_param_t *timer_param)
     if (ucChannel < 3)
     {
         value = (PWD_TIMER_26M_CLK_BIT);
-        sddev_control(ICU_DEV_NAME, CMD_CLK_PWR_UP, (void *)&value);
+        icu_ctrl(CMD_CLK_PWR_UP, (void *)&value);
 
         value = bk_timer_cal_endvalue(ucChannel, timer_param->period, timer_param->div);
         REG_WRITE(REG_TIMERCTLA_PERIOD_ADDR(ucChannel), value);
@@ -99,7 +99,7 @@ static UINT32 init_timer_param(timer_param_t *timer_param)
     else
     {
         value = (PWD_TIMER_32K_CLK_BIT);
-        sddev_control(ICU_DEV_NAME, CMD_CLK_PWR_UP, (void *)&value);
+        icu_ctrl(CMD_CLK_PWR_UP, (void *)&value);
 
         value = bk_timer_cal_endvalue(ucChannel, timer_param->period, timer_param->div);
         REG_WRITE(REG_TIMERCTLB_PERIOD_ADDR(ucChannel), value);
@@ -233,6 +233,8 @@ UINT32 bk_timer_ctrl(UINT32 cmd, void *param)
 
     case CMD_TIMER_READ_CNT:
         p_param = (timer_param_t *)param;
+		
+#if (CFG_SOC_NAME != SOC_BK7221U)
         i_time_out = 0;
         if (p_param->channel < 3)
         {
@@ -253,7 +255,7 @@ UINT32 bk_timer_ctrl(UINT32 cmd, void *param)
         }
         else if (p_param->channel < 6)
         {
-            REG_WRITE(TIMER3_5_READ_CTL, ((p_param->channel) << 2) | 1);
+            REG_WRITE(TIMER3_5_READ_CTL, ((p_param->channel - 3) << 2) | 1);
             while (REG_READ(TIMER3_5_READ_CTL) & 1)
             {
                 i_time_out ++;
@@ -268,6 +270,9 @@ UINT32 bk_timer_ctrl(UINT32 cmd, void *param)
                 p_param->period = REG_READ(TIMER3_5_READ_VALUE);
             }
         }
+#else
+		(void)i_time_out;
+#endif		
         break;
     default:
         ret = BK_TIMER_FAILURE;

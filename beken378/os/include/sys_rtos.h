@@ -2,6 +2,7 @@
 #define _SYS_RTOS_H_
 
 #include "include.h"
+#include "rtos_pub.h"
 
 #if CFG_OS_FREERTOS
 #include "FreeRTOSConfig.h"
@@ -10,6 +11,6 @@
 #include "queue.h"
 #include "semphr.h"
 #endif
-
 #endif // _SYS_RTOS_H_
+// eof
 

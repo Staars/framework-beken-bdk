@@ -17,6 +17,7 @@
 #include "video_transfer_tcp.h"
 #include "video_transfer_udp.h"
 #include "video_demo_pub.h"
+#include "video_upd_spd.h"
 
 
 #define APP_DEMO_STA_DEBUG        1
@@ -40,12 +41,6 @@ typedef enum
     APS_APP_DISCONECTED,
     APS_APP_CONECTED,
 } DEMO_STA_STATUS;
-
-typedef struct temp_message
-{
-    u32 dmsg;
-    u32 data;
-} DRONE_MSG_T;
 
 typedef struct app_demo_sta_st
 {
@@ -241,6 +236,10 @@ static void app_demo_sta_main(beken_thread_arg_t data)
                     #if APP_DEMO_CFG_USE_TCP
                     app_demo_tcp_deinit();
                     #endif
+
+                    #if APP_DEMO_CFG_USE_UDP_SDP
+                    vudp_sdp_stop();
+                    #endif   
                     APP_DEMO_STA_PRT("wifi disconnected!\r\n");
                 }
                 break;
@@ -256,6 +255,10 @@ static void app_demo_sta_main(beken_thread_arg_t data)
 
                     #if APP_DEMO_CFG_USE_TCP
                     app_demo_tcp_init();
+                    #endif
+
+                    #if APP_DEMO_CFG_USE_UDP_SDP
+                    vudp_sdp_start();
                     #endif
                     APP_DEMO_STA_PRT("wifi connected!\r\n");
                 }

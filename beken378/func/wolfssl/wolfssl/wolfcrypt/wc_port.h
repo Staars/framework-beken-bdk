@@ -705,6 +705,10 @@ WOLFSSL_API int wolfCrypt_Cleanup(void);
 #elif defined(WOLFSSL_GMTIME)
     struct tm* gmtime(const time_t* timer);
 #endif
+#else
+    //struct tm *gmtime(const time_t* timer);
+	extern time_t os_time(time_t *tm);
+	#define XTIME(tl)       os_time((tl))
 #endif /* NO_ASN_TIME */
 
 #ifndef WOLFSSL_LEANPSK

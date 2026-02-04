@@ -18,7 +18,6 @@
 #define PARAM_CFG_FATAL    null_prf
 #endif
 
-#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT)
 #define CONFIG_ROLE_NULL        0
 #define CONFIG_ROLE_AP          1
 #define CONFIG_ROLE_STA         2
@@ -28,7 +27,6 @@
 #define MAC_ITEM                 1
 #define MAC_RF_OTP_FLASH         2
 #define WIFI_MAC_POS             MAC_RF_OTP_FLASH
-#endif
 
 #define DEFAULT_CHANNEL_AP      11
 
@@ -51,7 +49,7 @@ typedef struct ap_param
 {
     struct mac_addr bssid;
     struct mac_ssid ssid;
-	
+
     uint8_t chann;
     uint8_t cipher_suite;
     uint8_t key[65];
@@ -67,6 +65,17 @@ typedef struct sta_param
     uint8_t key_len;
     uint8_t fast_connect_set;
     fast_connect_param_t fast_connect;
+
+#if CFG_WPA2_ENTERPRISE
+	/* starts of WPA2-Enterprise/WPA3-Enterprise EAP-TLS configuration */
+	char eap[16];					   /**< phase1 authType: TLS/TTLS/SIM */
+	char identity[32];				   /**< user identity */
+	char ca[32];					   /**< CA certificate filename */
+	char client_cert[32];			   /**< client's Certification filename in PEM,DER format */
+	char private_key[32];			   /**< client's private key filename in PEM,DER format */
+	char private_key_passwd[32];	   /**< client's private key password */
+	char phase1[32];				   /**< client's phase1 parameters */
+#endif
 } sta_param_t;
 
 extern general_param_t *g_wlan_general_param;
@@ -75,7 +84,7 @@ extern sta_param_t *g_sta_param_ptr;
 
 uint32_t cfg_param_init(void);
 
-#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT)
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT) || (CFG_SUPPORT_LITEOS)
 extern uint8_t system_mac[];
 
 void cfg_load_mac(u8 *mac);

@@ -72,8 +72,10 @@ static UINT32 info_item_len(NET_INFO_ITEM item)
 		case DHCP_MODE_ITEM:
 		case RF_CFG_TSSI_ITEM:
 		case RF_CFG_DIST_ITEM:
-		case RF_CFG_MODE_ITEM: 
+		case RF_CFG_MODE_ITEM:
 		case RF_CFG_TSSI_B_ITEM:
+		case RF_CFG_TSSI_N20_ITEM:
+		case RF_CFG_TSSI_N40_ITEM:
 			len = sizeof(ITEM_COMM_ST);
 			break;
 		case WIFI_MAC_ITEM:
@@ -123,9 +125,11 @@ UINT32 get_info_item(NET_INFO_ITEM item,UINT8 *ptr0,UINT8 *ptr1, UINT8 *ptr2)
 		case WIFI_MAC_ITEM:
 		case RF_CFG_TSSI_ITEM:
 		case RF_CFG_DIST_ITEM:
-		case RF_CFG_MODE_ITEM: 
+		case RF_CFG_MODE_ITEM:
 		case CHARGE_CONFIG_ITEM:
 		case RF_CFG_TSSI_B_ITEM:
+		case RF_CFG_TSSI_N20_ITEM:
+		case RF_CFG_TSSI_N40_ITEM:
 			if(ptr0 != NULL)
 			{
 				ddev_read(flash_handle, (char *)ptr0, head.len, addr_start);
@@ -218,8 +222,10 @@ UINT32 save_info_item(NET_INFO_ITEM item,UINT8 *ptr0,UINT8*ptr1,UINT8 *ptr2)
 		case DHCP_MODE_ITEM:
 		case RF_CFG_TSSI_ITEM:
 		case RF_CFG_DIST_ITEM:
-		case RF_CFG_MODE_ITEM: 
+		case RF_CFG_MODE_ITEM:
 		case RF_CFG_TSSI_B_ITEM:
+		case RF_CFG_TSSI_N20_ITEM:
+		case RF_CFG_TSSI_N40_ITEM:
 			os_memcpy(item_buf,ptr0,4);
 			break;
 			

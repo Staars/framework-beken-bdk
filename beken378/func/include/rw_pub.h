@@ -80,6 +80,8 @@ typedef struct cfg80211_scan_params
     struct mac_ssid ssids[SCAN_SSID_MAX];
     struct mac_addr bssid;
 	int freqs[14];	//FIXME: 5G
+	uint16_t extra_ies_len;
+	uint8_t extra_ies[0];
 } SCAN_PARAM_T;
 
 typedef struct cfg80211_fast_scan_params
@@ -206,7 +208,6 @@ typedef struct sta_info_tag* STA_INF_PTR;
 
 extern struct co_list rw_msg_tx_head;
 extern struct co_list rw_msg_rx_head;
-
 extern void mt_msg_dispatch(UINT16 cmd, void *param);
 extern void mr_kmsg_flush(void);
 extern UINT32 mr_kmsg_fwd(struct ke_msg *msg);
@@ -225,8 +226,6 @@ extern UINT32 rwm_transfer(UINT8 vif_idx, UINT8 *buf, UINT32 len, int sync, void
 extern void* rwm_transfer_pre(UINT8 vif_idx, UINT8 *buf, UINT32 len);
 extern UINT32 rwm_uploaded_data_handle(UINT8 *upper_buf, UINT32 len);
 extern UINT32 rwm_get_rx_valid_node_len(void);
-
-
 extern int rw_msg_send(const void *msg_params, uint16_t reqid, void *cfm);
 extern int rw_msg_send_reset(void);
 extern int rw_msg_send_start(void);
@@ -235,6 +234,8 @@ extern int rw_msg_send_me_chan_config_req(void);
 extern int rw_msg_send_add_if(const unsigned char *mac,
                      enum nl80211_iftype iftype, bool p2p, struct mm_add_if_cfm *cfm);
 extern int rw_msg_send_remove_if(u8 vif_index);
+extern int rw_msg_send_roc(u8 vif_index, unsigned int freq, uint32_t duration);
+extern int rw_msg_send_cancel_roc(u8 vif_index);
 extern int rw_msg_send_apm_start_req(u8 vif_index, u8 channel,
                      struct apm_start_cfm *cfm);
 extern int rw_msg_send_bcn_change(void *bcn_param);
@@ -271,6 +272,7 @@ STA_INF_PTR rwm_mgmt_sta_mac2ptr(void *mac);
 UINT8 rwm_mgmt_sta_mac2idx(void *mac);
 UINT8 rwm_mgmt_vif_mac2idx(void *mac);
 UINT8 rwm_mgmt_vif_name2idx(char *name);
+UINT8 rwm_mgmt_update_rate(void);
 UINT8 rwm_mgmt_get_hwkeyidx(UINT8 vif_idx, UINT8 staid);
 void rwm_mgmt_set_vif_netif(struct netif *net_if);
 struct netif *rwm_mgmt_get_vif2netif(UINT8 vif_idx);
@@ -281,6 +283,7 @@ u8 rwn_mgmt_is_only_sta_role_add(void);
 void rwm_msdu_init(void);
 void rwm_flush_txing_list(UINT8 sta_idx);
 void rwm_msdu_ps_change_ind_handler(void *msg) ;
+void rwm_p2p_ps_change_ind_handler(void *msg);
 void rwm_msdu_send_txing_node(UINT8 sta_idx);
 
 __INLINE u8 rwm_mgmt_is_ap_inface(u8 vif_idx)

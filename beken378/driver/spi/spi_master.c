@@ -179,7 +179,7 @@ static void bk_spi_tx_finish_callback(int port, void *param)
     }
 }
 
-static void bk_spi_configure(UINT32 rate,UINT32 mode)
+void bk_spi_configure(UINT32 rate,UINT32 mode)
 {
     UINT32 param;
     struct spi_callback_des spi_dev_cb;

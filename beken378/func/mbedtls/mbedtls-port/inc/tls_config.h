@@ -54,7 +54,7 @@ extern void tls_mbedtls_mem_free(void *ptr);
 #define MBEDTLS_CIPHER_C
 #define MBEDTLS_AES_C
 #define MBEDTLS_CTR_DRBG_C
-// #define MBEDTLS_ECDH_C
+#define MBEDTLS_ECDH_C
 // #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ECP_C
 // #define MBEDTLS_GCM_C
@@ -64,7 +64,7 @@ extern void tls_mbedtls_mem_free(void *ptr);
 #define MBEDTLS_PK_C
 #define MBEDTLS_PK_PARSE_C
 #define MBEDTLS_SHA256_C
-// #define MBEDTLS_SHA512_C
+#define MBEDTLS_SHA512_C
 #define MBEDTLS_SSL_CLI_C
 // #define MBEDTLS_SSL_SRV_C
 #define MBEDTLS_SSL_TLS_C
@@ -99,7 +99,7 @@ extern void tls_mbedtls_mem_free(void *ptr);
 // #define MBEDTLS_HAVE_TIME_DATE
 #define MBEDTLS_CIPHER_MODE_CBC
 // #define MBEDTLS_CIPHER_MODE_CFB
-// #define MBEDTLS_CIPHER_MODE_CTR
+ #define MBEDTLS_CIPHER_MODE_CTR
 // #define MBEDTLS_CIPHER_PADDING_PKCS7
 // #define MBEDTLS_CIPHER_PADDING_ONE_AND_ZEROS
 // #define MBEDTLS_CIPHER_PADDING_ZEROS_AND_LEN
@@ -173,19 +173,19 @@ extern void tls_mbedtls_mem_free(void *ptr);
 // #define MBEDTLS_HMAC_DRBG_C
 // #define MBEDTLS_PADLOCK_C
 // #define MBEDTLS_PEM_WRITE_C
-// #define MBEDTLS_PK_WRITE_C
-// #define MBEDTLS_PKCS5_C
+#define MBEDTLS_PK_WRITE_C
+#define MBEDTLS_PKCS5_C
 #define MBEDTLS_PLATFORM_C
 // #define MBEDTLS_RIPEMD160_C
 // #define MBEDTLS_SSL_CACHE_C
 // #define MBEDTLS_SSL_COOKIE_C
 // #define MBEDTLS_SSL_TICKET_C
-// #define MBEDTLS_VERSION_C   
+// #define MBEDTLS_VERSION_C
 // #define MBEDTLS_X509_CRL_PARSE_C
 // #define MBEDTLS_X509_CSR_PARSE_C
 // #define MBEDTLS_X509_CREATE_C
-// #define MBEDTLS_X509_CRT_WRITE_C   
-// #define MBEDTLS_X509_CSR_WRITE_C   
+// #define MBEDTLS_X509_CRT_WRITE_C
+// #define MBEDTLS_X509_CSR_WRITE_C
 // #define MBEDTLS_XTEA_C
 
 #if defined(YOTTA_CFG_MBEDTLS_USER_CONFIG_FILE)

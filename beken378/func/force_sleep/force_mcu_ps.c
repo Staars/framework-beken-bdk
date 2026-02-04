@@ -32,6 +32,9 @@
 extern void sctrl_cali_dpll(UINT8 flag);
 extern void mcu_ps_cal_increase_tick(UINT32 *lost_p);
 extern UINT32 fclk_update_tick(UINT32 tick);
+extern void ble_entry(void);
+extern void ble_thread_exit(void);
+extern UINT32 ble_thread_is_up(void);
 
 typedef struct mcu_time_st {
 	uint64_t last_wakeup_time;
@@ -287,7 +290,7 @@ static void mcu_hw_sleep(void)
 	UINT32 reg;
 
 	REG_WRITE(SCTRL_ROSC_CAL, 0x35);
-	REG_WRITE(SCTRL_ROSC_CAL, 0x37);
+	REG_WRITE(SCTRL_ROSC_CAL, 0x36);
 
 	/* MCLK(main clock) select:dco*/
 	reg = REG_READ(SCTRL_CONTROL);
@@ -548,8 +551,18 @@ UINT32 force_mcu_ps(UINT64 sleep_us, UINT32 sleep_mode)
 		force_mcu_ps_start_tick_timer();
 		sleep_ms = (UINT32)(sleep_us / 1000);
 	} else if (g_mcu_sleep.cfg.sleep_mode == MCU_LOW_VOLTAGE_SLEEP) {
+        #if (CFG_BLE_VERSION == BLE_VERSION_5_x)
+        UINT32 ble_up = ble_thread_is_up();
+        if((g_mcu_sleep.cfg.off_ble == 1) && (ble_up == 1))
+            ble_thread_exit();
+        #endif
 		force_mcu_ps_entry(sleep_us);
 		force_mcu_ps_exit();
+        
+#if (CFG_BLE_VERSION == BLE_VERSION_5_x)
+        if((g_mcu_sleep.cfg.off_ble == 1) && (ble_up == 1))
+            ble_entry();
+#endif
 		sleep_ms = (UINT32)((rtos_get_time_us() - mcu_time.cur_sleep_time) / 1000);
 	}
 
@@ -609,6 +622,21 @@ void force_mcu_ps_clear_wakeup_time(void)
 UINT32 bk_force_instant_lowvol_sleep(PS_DEEP_CTRL_PARAM *lowvol_param)
 {
 	UINT64 sleep_us = 0;
+	UINT32 ret = 0;
+	// check adc is busy?
+	{
+		UINT32 check_cnt = 0;
+		extern UINT32 saradc_check_busy(void);
+		while(saradc_check_busy() == 1)
+		{
+			rtos_delay_milliseconds(100);
+			if((check_cnt++) > 10)
+			{
+				return 0;
+			}
+		}
+	}
+
 	if ((lowvol_param->wake_up_way & PS_DEEP_WAKEUP_GPIO)) {
 		if (lowvol_param->gpio_index_map) {
 			os_printf("---enter lowvol sleep :wake up with gpio 0~31 ps: 0x%x 0x%x \r\n",
@@ -641,7 +669,20 @@ UINT32 bk_force_instant_lowvol_sleep(PS_DEEP_CTRL_PARAM *lowvol_param)
 	} else
 		sleep_us = 0;
 
-	return force_mcu_ps(sleep_us, MCU_LOW_VOLTAGE_SLEEP);
+#if CFG_INT_WDG_ENABLED
+	UINT32 parameter;
+	parameter = PWD_ARM_WATCHDOG_CLK_BIT;
+	sddev_control(ICU_DEV_NAME, CMD_CLK_PWR_DOWN, (void *)&parameter);
+#endif
+
+	ret = force_mcu_ps(sleep_us, MCU_LOW_VOLTAGE_SLEEP);
+
+#if CFG_INT_WDG_ENABLED
+	parameter = PWD_ARM_WATCHDOG_CLK_BIT;
+	sddev_control(ICU_DEV_NAME, CMD_CLK_PWR_UP, (void *)&parameter);
+#endif
+
+	return ret;
 }
 
 #endif

@@ -196,7 +196,7 @@ int wolfSSL_dtls_export(WOLFSSL* ssl, unsigned char* buf, unsigned int* sz)
  * sequence number, epoch, AEAD state etc.
  *
  * buf is the argument to contain the serialized state, if null then set "sz" to
- *     buffer size required 
+ *     buffer size required
  * sz  is the size of the buffer passed in
  * ssl is the WOLFSSL struct to serialize
  * returns the size of serialized session on success, 0 on no action, and
@@ -22615,7 +22615,7 @@ int wolfSSL_RAND_seed(const void* seed, int len)
  */
 const char* wolfSSL_RAND_file_name(char* fname, unsigned long len)
 {
-#ifndef NO_FILESYSTEM
+#if 0//ndef NO_FILESYSTEM
     char* rt;
     char ap[] = "/.rnd";
 
@@ -22734,7 +22734,7 @@ int wolfSSL_RAND_write_file(const char* fname)
     return bytes;
 }
 
-#ifndef FREERTOS_TCP
+#if 0//ndef FREERTOS_TCP
 
 /* These constant values are protocol values made by egd */
 #if defined(USE_WOLFSSL_IO) && !defined(USE_WINDOWS_API)
@@ -22940,7 +22940,7 @@ int wolfSSL_RAND_bytes(unsigned char* buf, int num)
         rng = tmpRNG;
         initTmpRng = 1;
     }
- 
+
     if (rng) {
         if (wc_RNG_GenerateBlock(rng, buf, num) != 0)
             WOLFSSL_MSG("Bad wc_RNG_GenerateBlock");
@@ -23965,6 +23965,7 @@ char *wolfSSL_BN_bn2hex(const WOLFSSL_BIGNUM *bn)
  */
 int wolfSSL_BN_print_fp(XFILE fp, const WOLFSSL_BIGNUM *bn)
 {
+#if 0
     char *buf;
 
     WOLFSSL_ENTER("wolfSSL_BN_print_fp");
@@ -23982,6 +23983,7 @@ int wolfSSL_BN_print_fp(XFILE fp, const WOLFSSL_BIGNUM *bn)
 
     fprintf(fp, "%s", buf);
     XFREE(buf, NULL, DYNAMIC_TYPE_OPENSSL);
+#endif
 
     return WOLFSSL_SUCCESS;
 }

@@ -84,6 +84,10 @@ struct scanu_env_tag
     struct mac_addr bssid;
     /// SSID looked for.
     struct mac_ssid ssid;
+    #if (NX_P2P)
+    /// P2P Scan (ssid we are looking for is "DIRECT-")
+    bool p2p_scan;
+    #endif //(NX_P2P)
 
 	struct scanu_setting setting;
 };
@@ -161,7 +165,7 @@ void scanu_start(void);
  *
  ****************************************************************************************
  */
-void scanu_scan_next(void);
+void scanu_scan_next(uint8_t status);
 
 /**
  ****************************************************************************************

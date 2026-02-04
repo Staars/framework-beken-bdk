@@ -2846,7 +2846,7 @@
  * IP6_DEBUG: Enable debugging for IPv6.
  */
 #if !defined IP6_DEBUG || defined __DOXYGEN__
-#define IP6_DEBUG                       LWIP_DBG_OFF
+#define IP6_DEBUG                       LWIP_DBG_ON
 #endif
 /**
  * @}

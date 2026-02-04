@@ -22,6 +22,7 @@
 #include "sys_rtos.h"
 #include "mem_pub.h"
 #include "uart_pub.h"
+#include "rtos_pub.h"
 
 /************** wrap C library functions **************/
 void * __wrap_malloc (size_t size)
@@ -37,7 +38,7 @@ void * __wrap__malloc_r (void *p, size_t size)
 
 void __wrap_free (void *pv)
 {
-	vPortFree(pv);
+	os_free(pv);
 }
 
 void * __wrap_calloc (size_t a, size_t b)
@@ -55,7 +56,7 @@ void * __wrap_calloc (size_t a, size_t b)
 
 void * __wrap_realloc (void* pv, size_t size)
 {
-	return pvPortRealloc(pv, size);
+	return os_realloc(pv, size);
 }
 
 void __wrap__free_r (void *p, void *x)

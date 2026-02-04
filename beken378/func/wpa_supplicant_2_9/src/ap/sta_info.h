@@ -14,7 +14,7 @@
 #include "common/wpa_common.h"
 #endif /* CONFIG_MESH */
 
-#include "list.h"
+#include "utils/list.h"
 #include "vlan.h"
 #include "common/wpa_common.h"
 #include "common/ieee802_11_defs.h"
@@ -140,6 +140,19 @@ struct sta_info {
 
 	/* IEEE 802.1X related data */
 	struct eapol_state_machine *eapol_sm;
+#if CFG_WIFI_P2P_GO
+	struct pending_eapol_rx *pending_eapol_rx;
+
+	u64 acct_session_id;
+	struct os_reltime acct_session_start;
+	int acct_session_started;
+	int acct_terminate_cause; /* Acct-Terminate-Cause */
+	int acct_interim_interval; /* Acct-Interim-Interval */
+	unsigned int acct_interim_errors;
+	char *identity; /* User-Name from RADIUS */
+	char *radius_cui; /* Chargeable-User-Identity from RADIUS */
+#endif
+
 	u8 *challenge; /* IEEE 802.11 Shared Key Authentication Challenge */
 
 	struct wpa_state_machine *wpa_sm;

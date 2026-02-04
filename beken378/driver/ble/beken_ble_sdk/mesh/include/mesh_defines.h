@@ -36,7 +36,9 @@
  ****************************************************************************************
  */
 
+#ifndef UNUSED
 #define UNUSED(x)                      (void)(x)
+#endif
 
 /// Invalid Local identifier
 #define MESH_INVALID_LID               (0xFF)

@@ -70,19 +70,14 @@ static void bk_spi_slave_spi_rx_callback(int is_rx_end, void *param)
 {
 	UINT8 ch;
 	struct spi_rx_fifo *rx_fifo;
-	//GLOBAL_INT_DECLARATION();
 
 	rx_fifo = (struct spi_rx_fifo *)spi_slave_dev->rx_fifo;
 	ASSERT(rx_fifo != NULL);
 
 	os_printf("rx callback:rx_end:%d\r\n ", is_rx_end);
-	//REG_WRITE((0x00802800+(18*4)), 0x02);
 	while (1) {
 		if (spi_read_rxfifo(&ch) == 0)
 			break;
-		//REG_WRITE((0x00802800+(0x1a*4)), 0x02);
-		//REG_WRITE((0x00802800+(0x1a*4)), 0x00);
-		//GLOBAL_INT_DISABLE();
 
 		rx_fifo->buffer[rx_fifo->put_index] = ch;
 		rx_fifo->put_index += 1;
@@ -95,7 +90,6 @@ static void bk_spi_slave_spi_rx_callback(int is_rx_end, void *param)
 			if (rx_fifo->get_index >= SPI_SLAVE_RX_FIFO_LEN)
 				rx_fifo->get_index = 0;
 		}
-		//GLOBAL_INT_RESTORE();
 
 		if (spi_slave_dev->tx_ptr == NULL)
 			spi_write_txfifo(0xFF);
@@ -106,7 +100,6 @@ static void bk_spi_slave_spi_rx_callback(int is_rx_end, void *param)
 		os_printf("----> rx end\r\n");
 		rtos_set_semaphore(&spi_slave_dev->rx_sem);
 	}
-	//REG_WRITE((0x00802800+(18*4)), 0x00);
 }
 
 static int bk_spi_slave_get_rx_data(UINT8 *rx_buf, int len)

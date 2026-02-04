@@ -28,9 +28,11 @@ typedef struct vbuf_hdr_st
     UINT8 pkt_seq;
 } VB_HDR_ST, *VB_HDR_PTR;
 
-#define BUF_STA_DONE        0
+#define BUF_STA_INIT        0
 #define BUF_STA_COPY        1
-#define BUF_STA_FULL        2
+#define BUF_STA_GET         2
+#define BUF_STA_FULL        3
+#define BUF_STA_ERR         4
 
 typedef struct video_buffer_st
 {
@@ -71,7 +73,7 @@ static void video_buffer_add_pkt_header(TV_HDR_PARAM_PTR param)
 
 static int video_buffer_recv_video_data(UINT8 *data, UINT32 len)
 {
-    if (g_vbuf->buf_base)
+    if ((g_vbuf->buf_base) && ((BUF_STA_COPY == g_vbuf->start_buf) || (BUF_STA_INIT == g_vbuf->start_buf )))
     {
         VB_HDR_PTR hdr = (VB_HDR_PTR)data;
         UINT32 org_len, left_len;
@@ -147,13 +149,17 @@ static int video_buffer_recv_video_data(UINT8 *data, UINT32 len)
                     {
                         //os_printf("set ph\r\n");
                         GLOBAL_INT_DISABLE();
-                        g_vbuf->start_buf = BUF_STA_DONE;
+                        g_vbuf->start_buf = BUF_STA_GET;
                         GLOBAL_INT_RESTORE();
-
-                        // all frame data have received, wakeup usr thread
-                        rtos_set_semaphore(&g_vbuf->aready_semaphore);
                     }
-
+                    else
+                    {
+                        GLOBAL_INT_DISABLE();
+                        g_vbuf->start_buf = BUF_STA_ERR;
+                        GLOBAL_INT_RESTORE();
+                    }
+                   // all frame data have received, wakeup usr thread
+                    rtos_set_semaphore(&g_vbuf->aready_semaphore);
                 }
             }
             else
@@ -162,10 +168,9 @@ static int video_buffer_recv_video_data(UINT8 *data, UINT32 len)
                 GLOBAL_INT_DISABLE();
                 g_vbuf->start_buf = BUF_STA_FULL;
                 GLOBAL_INT_RESTORE();
-
+                rtos_set_semaphore(&g_vbuf->aready_semaphore);
             }
         }
-
         return len;
     }
     else
@@ -188,7 +193,7 @@ int video_buffer_open(void)
         if (g_vbuf == NULL)
         {
             os_printf("vbuf init no mem\r\n");
-            return 0;
+            return kNoMemoryErr;
         }
 
         if (rtos_init_semaphore(&g_vbuf->aready_semaphore, 1) != kNoErr)
@@ -196,7 +201,7 @@ int video_buffer_open(void)
             os_printf("vbuf init semaph failed\r\n");
             os_free(g_vbuf);
             g_vbuf = NULL;
-            return 0;
+            return kGeneralErr;
         }
 
         GLOBAL_INT_DISABLE();
@@ -205,7 +210,7 @@ int video_buffer_open(void)
 
         g_vbuf->frame_len = 0;
         g_vbuf->buf_ptr = NULL;
-        g_vbuf->start_buf = BUF_STA_DONE;
+        g_vbuf->start_buf = BUF_STA_INIT;
 
         g_vbuf->frame_id = 0xffff;
         g_vbuf->frame_pkt_cnt = 0;
@@ -221,16 +226,17 @@ int video_buffer_open(void)
         setup.add_pkt_header = video_buffer_add_pkt_header;
 
         ret = video_transfer_init(&setup);
-        if (ret != 0)
+        if (ret != kNoErr)
         {
             os_printf("video_transfer_init failed\r\n");
             rtos_deinit_semaphore(&g_vbuf->aready_semaphore);
             os_free(g_vbuf);
             g_vbuf = NULL;
-            return ret;
+            return kOpenErr;
         }
 
         os_printf("vbuf opened\r\n");
+        return 1;
     }
 
     return 0;
@@ -241,8 +247,6 @@ int video_buffer_close(void)
     if (g_vbuf)
     {
         int ret;
-        os_printf("voide close\r\n");
-
         ret = video_transfer_deinit();
         if (ret != 0)
         {
@@ -252,10 +256,14 @@ int video_buffer_close(void)
 
         if (g_vbuf->buf_base)
         {
-            // user all video_buffer_read_frame and blocked, so wakeup it
-            rtos_set_semaphore(&g_vbuf->aready_semaphore);
+            do
+            {
+                // user all video_buffer_read_frame and blocked, so wakeup it
+                rtos_set_semaphore(&g_vbuf->aready_semaphore);
 
-            // wait until clear the buf flag
+                // wait until clear the buf flag
+                rtos_delay_milliseconds(10);
+            }
             while (g_vbuf->buf_base);
         }
 
@@ -269,26 +277,31 @@ int video_buffer_close(void)
 
         os_free(g_vbuf);
         g_vbuf = NULL;
+
+        return 1;
     }
 
     return 0;
 }
 
-UINT32 video_buffer_read_frame(UINT8 *buf, UINT32 buf_len)
+// err_code:
+//  0: success,
+// -1: param error, -2: buffer full, -3: frame data err, -4: timeout, -5: unknow err
+UINT32 video_buffer_read_frame(UINT8 *buf, UINT32 buf_len, int *err_code, UINT32 timeout)
 {
-    UINT32 frame_len = 0;
+    UINT32 frame_len = 0, err = -5;
     GLOBAL_INT_DECLARATION();
 
     if ((buf == NULL) || (buf_len == 0))
     {
+        if(err_code)
+            *err_code = -1;
         return 0;
     }
 
     if (g_vbuf && (g_vbuf->buf_base == NULL))
     {
         int ret;
-        UINT32 timeout;
-
         // try to get semaphore, clear send by the previous frame
         while (rtos_get_semaphore(&g_vbuf->aready_semaphore, 0) == kNoErr);
 
@@ -297,23 +310,48 @@ UINT32 video_buffer_read_frame(UINT8 *buf, UINT32 buf_len)
         g_vbuf->buf_len = buf_len;
         GLOBAL_INT_RESTORE();
 
-        timeout = BEKEN_WAIT_FOREVER;
-
         ret = rtos_get_semaphore(&g_vbuf->aready_semaphore, timeout);
-        if (ret == kNoErr)
+        if(ret == kNoErr)
         {
-            frame_len = g_vbuf->frame_len;
+            if(BUF_STA_GET == g_vbuf->start_buf)
+            {
+                frame_len = g_vbuf->frame_len;
+                err = 0;
+            }
+            else if(BUF_STA_FULL == g_vbuf->start_buf)
+            {
+                os_printf("read frame full\r\n");
+                err = -2;
+            }
+            else if(BUF_STA_ERR == g_vbuf->start_buf)
+            {
+                os_printf("read frame data err\r\n");
+                err = -3;
+            }
+            else
+            {
+                os_printf("read frame unknow err\r\n");
+                err = -4;
+            }
         }
         else
         {
-            os_printf("read frame time out\r\n");
+            os_printf("read frame timeout :%d\r\n", timeout);
+            err = -5;
         }
 
         GLOBAL_INT_DISABLE();
+        g_vbuf->start_buf = BUF_STA_INIT;
         g_vbuf->buf_base = NULL;
         g_vbuf->buf_len = 0;
         GLOBAL_INT_RESTORE();
     }
+
+    if(frame_len >= buf_len )
+        frame_len = buf_len;
+
+    if(err_code)
+        *err_code = err;
 
     return frame_len;
 }
@@ -323,7 +361,7 @@ UINT32 video_buffer_read_frame(UINT8 *buf, UINT32 buf_len)
 #if VIDEO_BUFFER_CMD
 #include "string.h"
 #include "stdlib.h"
-
+extern int hexstr2bin(const char *hex, u8 *buf, size_t len);
 void video_buffer(int argc, char **argv)
 {
     if (strcmp(argv[1], "open") == 0)
@@ -331,10 +369,10 @@ void video_buffer(int argc, char **argv)
         video_buffer_open();
     }
     else if (strcmp(argv[1], "read") == 0)
-
     {
         uint8_t *mybuf;
-        uint32_t my_len;
+        uint32_t my_len, get_len = 0;
+        int get_ret = 0;
 
         my_len = atoi(argv[2]);
         mybuf = os_malloc(my_len);
@@ -345,12 +383,12 @@ void video_buffer(int argc, char **argv)
             return;
         }
 
-        my_len = video_buffer_read_frame(mybuf, my_len);
-        os_printf("frame_len: %d\r\n", my_len);
+        get_len = video_buffer_read_frame(mybuf, my_len, &get_ret, BEKEN_WAIT_FOREVER);
+        os_printf("get frame ret: %d, len:%d\r\n", get_ret, get_len);
 
-        if (1)
+        if(get_ret == 0)
         {
-            for (int i = 0; i < my_len; i++)
+            for (int i = 0; i < get_len; i++)
             {
                 os_printf("%02x,", mybuf[i]);
                 if ((i + 1) % 32 == 0)
@@ -359,12 +397,38 @@ void video_buffer(int argc, char **argv)
                 }
             }
         }
+        else if((get_ret == -2) || (get_ret == -3))
+        {
+            os_printf("full or data err, retry? \r\n");
+        }
         os_free(mybuf);
     }
     else if (strcmp(argv[1], "close") == 0)
     {
         video_buffer_close();
     }
+	else if (strcmp(argv[1], "reg_r") == 0)
+	{
+		extern UINT32 camera_intfer_get_senser_reg(UINT16 addr, UINT8 *data);
+		UINT16 addr;
+		UINT8 data;
+
+		hexstr2bin((const char *)argv[2], (UINT8*)&addr, 1);
+		camera_intfer_get_senser_reg(addr, &data);
+		os_printf("read senser reg:%02x, %02x\r\n", addr, data);
+	}
+	else if (strcmp(argv[1], "reg_w") == 0)
+	{
+		extern UINT32 camera_intfer_set_senser_reg(UINT16 addr, UINT8 data);
+		UINT16 addr;
+		UINT8 data;
+
+		hexstr2bin((const char *)argv[2], (UINT8*)&addr, 1);
+		hexstr2bin((const char *)argv[3], (UINT8*)&data, 1);
+
+		camera_intfer_set_senser_reg(addr, data);
+		os_printf("write senser reg:%02x, %02x\r\n", addr, data);
+	}
     else
     {
         os_printf("vbuf open/read len/close/\r\n");

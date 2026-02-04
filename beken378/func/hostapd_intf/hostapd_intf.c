@@ -22,6 +22,8 @@
 #include "sm_task.h"
 #include "rw_msg_rx.h"
 #include "mm_bcn.h"
+#include "wpa_ctrl.h"
+#include "bk_err.h"
 
 #if CFG_ROLE_LAUNCH
 #include "role_launch.h"
@@ -30,7 +32,9 @@
 #include "power_save_pub.h"
 #include "fake_clock_pub.h"
 #include "ieee802_11_common.h"
-
+#if CFG_TX_BUFING
+#include "rw_tx_buffering.h"
+#endif
 /* forward declaration */
 FUNC_1PARAM_PTR bk_wlan_get_status_cb(void);
 void wpa_hostapd_release_scan_rst(void);
@@ -195,8 +199,8 @@ int hapd_intf_sta_add(struct prism2_hostapd_param *param, int len)
     {
         WPAS_PRT("sta_idx:%d, pm_state:%d\r\n", cfm->sta_idx, cfm->pm_state);
 
-#if CFG_USE_AP_PS
-        rwm_flush_txing_list(cfm->sta_idx);
+#if CFG_TX_BUFING
+        rwm_tx_bufing_end(cfm->sta_idx);
 #endif
     }
     os_free(cfm);
@@ -246,8 +250,8 @@ int hapd_intf_sta_del(struct prism2_hostapd_param *param, int len)
 
     WPAS_PRT("hapd_intf_sta_del:%d\r\n", sta_idx);
 
-#if CFG_USE_AP_PS
-    rwm_flush_txing_list(sta_idx);
+#if CFG_TX_BUFING
+    rwm_tx_bufing_end(sta_idx);
 #endif
 
     return rw_msg_send_me_sta_del(sta_idx, tdls_sta);
@@ -541,27 +545,61 @@ int wpa_reg_deauth_evt_callback(struct prism2_hostapd_param *param, int len)
 
 int wpa_send_scan_req(struct prism2_hostapd_param *param, int len)
 {
-    UINT8 i;
-    SCAN_PARAM_T scan_param;
+	UINT8 i;
+	int ret;
+	SCAN_PARAM_T *scan_param;
 
-    WPAS_PRT("wpa_send_scan_req\r\n");
-    scan_param.num_ssids = param->u.scan_req.ssids_num;
-    scan_param.bssid = mac_addr_bcst;
-    for(i = 0; i < scan_param.num_ssids; i++)
-    {
-        scan_param.ssids[i].length = param->u.scan_req.ssids[i].ssid_len;
-        os_memcpy(scan_param.ssids[i].array, param->u.scan_req.ssids[i].ssid, scan_param.ssids[i].length);
-#if CFG_SUPPORT_BSSID_CONNECT
-        if (('\0' == scan_param.ssids[i].array[0]) || (scan_param.ssids[i].length == 0))
-        {
-            os_memcpy((void *)&scan_param.bssid, param->u.scan_req.ssids[i].bssid, sizeof(scan_param.bssid));
-        }
-#endif
-    }
-    scan_param.vif_idx = param->vif_idx;
-	os_memcpy(scan_param.freqs, param->u.scan_req.freqs, sizeof(scan_param.freqs));
+	WPAS_PRT("wpa_send_scan_req\r\n");
 
-    return rw_msg_send_scanu_req(&scan_param);
+	scan_param = os_zalloc(sizeof(*scan_param) + param->u.scan_req.extra_ies_len);
+	if (!scan_param) {
+		WPAS_PRT("send scan req OOM\n");
+		return BK_ERR_NO_MEM;
+	}
+	scan_param->num_ssids = param->u.scan_req.ssids_num;
+	os_memcpy(&scan_param->bssid, param->u.scan_req.bssid, ETH_ALEN);
+	for (i = 0; i < scan_param->num_ssids; i++) {
+		scan_param->ssids[i].length = param->u.scan_req.ssids[i].ssid_len;
+		os_memcpy(scan_param->ssids[i].array, param->u.scan_req.ssids[i].ssid, scan_param->ssids[i].length);
+	}
+	scan_param->vif_idx = param->vif_idx;
+	os_memcpy(scan_param->freqs, param->u.scan_req.freqs, sizeof(scan_param->freqs));
+	os_memcpy(scan_param->extra_ies, param->u.scan_req.extra_ies, param->u.scan_req.extra_ies_len);
+	scan_param->extra_ies_len = param->u.scan_req.extra_ies_len;
+
+	ret = rw_msg_send_scanu_req(scan_param);
+
+	os_free(scan_param);
+
+	return ret;
+}
+
+/* extract neccary ies for wpa_s */
+int wlan_get_bss_beacon_ies(struct wpabuf *buf, const u8 *bcn_ie, int ie_len)
+{
+	const u8 *ie;
+	const u8 *vsie;
+	u8 ies[] = {WLAN_EID_SSID, WLAN_EID_RSN};
+
+	buf->used = 0;
+
+	// IEs
+	for (int i = 0; i < ARRAY_SIZE(ies); i++) {
+		ie = get_ie(bcn_ie, ie_len, ies[i]);
+		if (ie) {
+			if (wpabuf_tailroom(buf) >= ie[1] + 2)
+				wpabuf_put_data(buf, ie, ie[1] + 2);
+		}
+	}
+
+	// VS IE
+	vsie = get_vendor_ie(bcn_ie, ie_len, WPA_IE_VENDOR_TYPE);
+	if (vsie) {
+		if (wpabuf_tailroom(buf) >= vsie[1] + 2)
+			wpabuf_put_data(buf, vsie, vsie[1] + 2);
+	}
+
+	return 0;
 }
 
 int wpa_get_scan_rst(struct prism2_hostapd_param *param, int len)
@@ -572,21 +610,33 @@ int wpa_get_scan_rst(struct prism2_hostapd_param *param, int len)
 	FUNC_1PARAM_PTR fn;
 	int i, ret = 0;
 	u32 val;
+
+	// reduce IEs for scan only
+	bool reduce_ie = false;
+	u32 ie_len;
+	struct wpabuf *ies = 0;
 	GLOBAL_INT_DECLARATION();
 
 	GLOBAL_INT_DISABLE();
 	wpa_buffer_scan_results();
 
+	if (param->sta_addr[0] == 0xFF)
+		reduce_ie = true;
+
 	if (NULL == s_scan_result_upload_ptr) {
 		GLOBAL_INT_RESTORE();
 		WPAS_PRT("get_scan_rst_null\r\n");
 
-		fn = bk_wlan_get_status_cb();
-		if (fn) {
-			val = RW_EVT_STA_NO_AP_FOUND;
-			(*fn)(&val);
+		rw_evt_type net_type =  mhdr_get_station_status();
+		if((net_type != RW_EVT_STA_GOT_IP) && (net_type != RW_EVT_STA_CONNECTED))
+		{
+			fn = bk_wlan_get_status_cb();
+			if (fn) {
+				val = RW_EVT_STA_NO_AP_FOUND;
+				(*fn)(&val);
+			}
+			mhdr_set_station_status(RW_EVT_STA_NO_AP_FOUND);
 		}
-		mhdr_set_station_status(RW_EVT_STA_NO_AP_FOUND);
 
 		UINT32 reg = RF_HOLD_BY_SCAN_BIT;
 		sddev_control(SCTRL_DEV_NAME, CMD_RF_HOLD_BIT_CLR, &reg);
@@ -604,9 +654,22 @@ int wpa_get_scan_rst(struct prism2_hostapd_param *param, int len)
 	}
 
 	WPAS_PRT("wpa_get_scan_rst:%d\r\n", s_scan_result_upload_ptr->scanu_num);
+
+	if (reduce_ie)
+		ies = wpabuf_alloc(128);
+
 	for (i = 0; s_scan_result_upload_ptr && i < s_scan_result_upload_ptr->scanu_num; i++) {
 		scan_rst_ptr = s_scan_result_upload_ptr->res[i];
-		r = os_zalloc(sizeof(*r) + scan_rst_ptr->ie_len);
+		ie_len = 0;
+		if (reduce_ie && ies) {
+			wlan_get_bss_beacon_ies(ies, (u8 *)(scan_rst_ptr + 1), scan_rst_ptr->ie_len);
+			ie_len = wpabuf_len(ies);
+			//bk_printf("ie_len: %d -> %d\n", scan_rst_ptr->ie_len, ie_len);
+		} else {
+			ie_len = scan_rst_ptr->ie_len;
+		}
+
+		r = os_zalloc(sizeof(*r) + ie_len);
 		if (r == NULL) {
 			ret = -1;
 			WPAS_PRT("wpa_get_scan_rst break;\r\n");
@@ -619,11 +682,17 @@ int wpa_get_scan_rst(struct prism2_hostapd_param *param, int len)
 		r->beacon_int = scan_rst_ptr->beacon_int;
 		r->caps = scan_rst_ptr->caps;
 		r->tsf = WPA_GET_BE64(scan_rst_ptr->tsf);
-		r->ie_len = scan_rst_ptr->ie_len;
+		r->ie_len = ie_len;
+		if (reduce_ie)
+			os_memcpy(r + 1, wpabuf_head(ies), wpabuf_len(ies));
+		else
 		os_memcpy(r + 1, scan_rst_ptr + 1, scan_rst_ptr->ie_len);
 
 		results->res[results->num++] = r;
 	}
+
+	if (reduce_ie && ies)
+		wpabuf_free(ies);
 
 	GLOBAL_INT_RESTORE();
 
@@ -769,6 +838,10 @@ int wpa_send_assoc_req(struct prism2_hostapd_param *param, int len)
 		os_memcpy((UINT8 *)connect_param->bcn_buf, (UINT8 *)param->u.assoc_req.bcn_buf, connect_param->bcn_len);
 
 	connect_param->auth_type = param->u.assoc_req.auth_alg;
+#if CFG_WIFI_P2P
+	connect_param->chan.band = PHY_BAND_2G4;
+	connect_param->chan.freq = param->u.assoc_req.freq;
+#endif
 	ret = sa_station_send_associate_cmd(connect_param);
 
 	os_free(connect_param);
@@ -1133,6 +1206,17 @@ int hapd_intf_ioctl(unsigned long arg)
 		ret = wpa_send_external_auth_status(param, len);
 #endif
 
+#if CFG_WIFI_P2P
+	case PRISM2_HOSTAPD_ROC:
+		ret = rw_msg_send_roc(param->vif_idx, param->u.roc.freq,
+			param->u.roc.duration);
+		break;
+
+	case PRISM2_HOSTAPD_CANCEL_ROC: {
+		ret = rw_msg_send_cancel_roc(param->vif_idx);
+	}	break;
+#endif
+
     default:
         break;
     }
@@ -1148,10 +1232,7 @@ void hapd_intf_ke_rx_handle(int dummy)
     S_TYPE_PTR type_ptr = (S_TYPE_PTR)dummy;
 
     if(type_ptr->type == HOSTAPD_MGMT
-#if NX_MFP
-		|| type_ptr->type == HOSTAPD_MGMT_ROBUST
-#endif
-		)
+		|| type_ptr->type == HOSTAPD_MGMT_ROBUST)
     {
         int param_len;
         struct ke_msg *kmsg_dst;

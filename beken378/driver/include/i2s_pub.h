@@ -44,7 +44,6 @@ enum
 #define bit_dbg(fmt, ...)
 #endif
 
-#define TX_FINISH_FLAG              (1 << 31)
 #define I2S_SA
 enum
 {

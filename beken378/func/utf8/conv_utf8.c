@@ -1,10 +1,10 @@
 #include <string.h>
-#include <stdlib.h> 
-#include <stdio.h> 
+#include <stdlib.h>
+#include <stdio.h>
 #include "typedef.h"
 #include <mem_pub.h>
 
-#if 1//CONFIG_USE_CONV_UTF8
+#if CFG_USE_CONV_UTF8
 #include "conv_utf8_gb2312_table.h"
 #include "conv_utf8_pub.h"
 static int conv_utf8_for_gb2312(unsigned char *pin, unsigned char *pout)
@@ -43,18 +43,18 @@ unsigned char *conv_utf8(unsigned char *input)
     unsigned char *ptr, *out_bak, *out;
 
     len = strlen((char*)input);
- 	len = (len / 2)*3 + 1;   
+ 	len = (len / 2)*3 + 1;
 
     out_bak = (unsigned char *)os_malloc(len);
-    if(!out_bak) 
+    if(!out_bak)
         return NULL;
-    
+
     ptr = input;
     out = out_bak;
 
-    while(*ptr) 
+    while(*ptr)
     {
-        if(conv_utf8_for_gb2312(ptr, out)) 
+        if(conv_utf8_for_gb2312(ptr, out))
         {
             out += 3;
             ptr += 2;
@@ -66,10 +66,10 @@ unsigned char *conv_utf8(unsigned char *input)
     }
     *out = 0;
 
-    
+
     //for(i=0; out_bak[i] != 0; i++)
     //    os_printf("%02x", out_bak[i]);
-    
+
     //os_printf("\r\n");
 
     return out_bak;
@@ -93,7 +93,7 @@ unsigned short SearchCodeTable(unsigned short unicodeKey)
         {
             end = mid - 1;
         }
-        else 
+        else
         {
             first = mid + 1;
         }
@@ -126,7 +126,7 @@ char* Utf8ToGb2312(char* utf8)
 
     if(!utf8)
         return NULL;
-        
+
     len = strlen(utf8);
     if(len <= 0)
         return NULL;
@@ -135,10 +135,10 @@ char* Utf8ToGb2312(char* utf8)
     if(!temp) {
         return NULL;
     }
-    
+
     //循环解析
     while (i < len)
-    {   
+    {
         int nbyte = GetUtf8ByteNumForWord((uint8_t)utf8[i]);
         switch(nbyte)
         {
@@ -166,7 +166,7 @@ char* Utf8ToGb2312(char* utf8)
                 //根据这个值查表取得对应的GB2312的值
                 gbKey = SearchCodeTable(unicodeKey);
                 temp[j] = (gbKey & 0xff00)>>8;
-                temp[j + 1] = (gbKey & 0x00ff);  
+                temp[j + 1] = (gbKey & 0x00ff);
 
                 byteCount = 3;
                 j += 2;
@@ -182,7 +182,7 @@ char* Utf8ToGb2312(char* utf8)
             default:
                 //printf("err! the len is more than 6\n");
                 byteCount = 1;
-            break;    
+            break;
         }
 
         i += byteCount;
@@ -190,7 +190,7 @@ char* Utf8ToGb2312(char* utf8)
 
     temp[j++] = '\0';
     memcpy(utf8, temp, j);
-    
+
     //printf("%s", utf8);
     os_free(temp);
 

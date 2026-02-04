@@ -394,9 +394,6 @@ typedef u64 __bitwise le64;
 struct wpa_ssid_value {
 	u8 ssid[SSID_MAX_LEN];
 	size_t ssid_len;
-#if CFG_SUPPORT_BSSID_CONNECT
-	u8 bssid[ETH_ALEN];
-#endif
 };
 
 int hwaddr_aton(const char *txt, u8 *addr);

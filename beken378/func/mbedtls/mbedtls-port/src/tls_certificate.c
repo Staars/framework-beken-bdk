@@ -48,12 +48,12 @@
 "-----END CERTIFICATE-----\r\n"
 
 
-const char mbedtls_root_certificate[] = 
+const char mbedtls_root_certificate[] =
 	ENTRUST_ROOT_CA
 	;
 #elif 0
 /////www.baidu.com
-#define GLOBALSIGN_ROOT_CA                                                 \ 
+#define GLOBALSIGN_ROOT_CA                                                 \
 "-----BEGIN CERTIFICATE-----\r\n"                                       \
 "MIIDdTCCAl2gAwIBAgILBAAAAAABFUtaw5QwDQYJKoZIhvcNAQEFBQAwVzELMAkG\r\n"  \
 "A1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExEDAOBgNVBAsTB1Jv\r\n"  \
@@ -76,7 +76,7 @@ const char mbedtls_root_certificate[] =
 "HMUfpIBvFSDJ3gyICh3WZlXi/EjJKSZp4A==\r\n"                              \
 "-----END CERTIFICATE-----"
 
-const char mbedtls_root_certificate[] = 
+const char mbedtls_root_certificate[] =
 	GLOBALSIGN_ROOT_CA
 ;
 #elif 1
@@ -106,7 +106,7 @@ const char mbedtls_root_certificate[] =
 "JkLASY80XmUo6WQVq7iN6mO3zsgIZmwmwSVnTcSPcHARoZ4=\r\n"  \
 "-----END CERTIFICATE-----\r\n"
 
-const char mbedtls_root_certificate[] = 
+const char mbedtls_root_certificate[] =
 	GLOBALSIGN_ROOT_CA
 ;
 #endif

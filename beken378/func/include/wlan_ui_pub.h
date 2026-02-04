@@ -6,6 +6,7 @@
 #include "include.h"
 #include "rtos_pub.h"
 #include "rw_msg_pub.h"
+
 #if CFG_WPA_CTRL_IFACE
 #include "wlan_defs_pub.h"
 #include "notifier_pub.h"
@@ -53,13 +54,14 @@ typedef struct _wifi_link_info
 typedef enum
 {
     BK_SOFT_AP,  /**< Act as an access point, and other station can connect, 4 stations Max*/
-    BK_STATION   /**< Act as a station which can connect to an access point*/
+    BK_STATION,   /**< Act as a station which can connect to an access point*/
+    BK_P2P
 } wlanInterfaceTypedef;
 
 /**
  *  @brief  Wi-Fi security type enumeration definition.
  */
-enum bk_wlan_sec_type_e
+ typedef enum bk_wlan_sec_type_e
 {
     BK_SECURITY_TYPE_NONE,        /**< Open system. */
     BK_SECURITY_TYPE_WEP,         /**< Wired Equivalent Privacy. WEP security. */
@@ -70,8 +72,10 @@ enum bk_wlan_sec_type_e
     BK_SECURITY_TYPE_WPA2_MIXED,  /**< WPA2 /w AES or TKIP */
     BK_SECURITY_TYPE_WPA3_SAE,	  /**< WPA3 SAE */
     BK_SECURITY_TYPE_WPA3_WPA2_MIXED, /** WPA3 SAE or WPA2 AES */
+	BK_SECURITY_TYPE_EAP,         /**< EAP */
+	BK_SECURITY_TYPE_OWE,         /**< OWE */
     BK_SECURITY_TYPE_AUTO,        /**< It is used when calling @ref bkWlanStartAdv, _BK_ read security type from scan result. */
-};
+}bk_wlan_sec_type;
 
 enum
 {
@@ -231,6 +235,10 @@ struct wlan_fast_connect_info
 	uint8_t channel;
 	uint8_t psk[65];
 	uint8_t pwd[65];
+
+	#if (FAST_CONNECT_INFO_ENC_METHOD == ENC_METHOD_AES)
+	uint8_t padding[5]; /* aes attention: sizeof(RL_BSSID_INFO_T) = 16 *n*/
+	#endif
 };
 
 
@@ -473,11 +481,11 @@ enum
 #define     PS_RF_SLEEP_BIT         CO_BIT(RF_SLEEP)
 #define     PS_MCU_SLEEP_BIT        CO_BIT(MCU_SLEEP)
 #define     PS_DEEP_SLEEP_BIT       CO_BIT(DEEP_PS)
+
 typedef     UINT32      BK_PS_LEVEL;
 
 void bk_wlan_connection_loss(void);
 void bk_wlan_start_assign_scan(UINT8 **ssid_ary, UINT8 ssid_num);
-
 void bk_wlan_scan_ap_reg_cb(FUNC_2PARAM_PTR ind_cb);
 unsigned char bk_wlan_get_scan_ap_result_numbers(void);
 int bk_wlan_get_scan_ap_result(SCAN_RST_ITEM_PTR scan_rst_table,unsigned char get_scanu_num);
@@ -537,6 +545,11 @@ int wlan_ap_set(uint8_t *ssid, uint8_t ssid_len, uint8_t *psk);
 int wlan_sta_wps_pbc(void);
 int wlan_sta_wps_pin_get(wlan_sta_wps_pin_t *wps);
 int wlan_sta_wps_pin_set(wlan_sta_wps_pin_t *wps);
+int wlan_p2p_listen(void);
+int wlan_p2p_find(void);
+int wlan_p2p_stop_find(void);
+int wlan_p2p_cancel(void);
+int wlan_p2p_connect(const uint8_t *mac, int method, int intent);
 
 int wlan_ap_set_config(wlan_ap_config_t *config);
 int wlan_ap_get_config(wlan_ap_config_t *config);
@@ -573,6 +586,12 @@ int wlan_is_mesh_monitor_mode(void);
 int wlan_set_mesh_bssid(uint8_t *bssid);
 uint8_t *wlan_get_mesh_bssid(void);
 #endif
+#endif
+
+#if CFG_WIFI_P2P_GO
+uint8_t bk_wlan_ap_get_default_channel(void);
+void app_p2p_rw_event_func(void *new_evt);
+void app_p2p_restart_thread(void);
 #endif
 
 #endif// _WLAN_UI_PUB_

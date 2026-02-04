@@ -42,8 +42,11 @@
 #include "easyflash.h"
 #include "bk_ef.h"
 #endif
-#if (!CFG_SUPPORT_RTT)
+
 #include "BkDriverFlash.h"
+
+#if ((CFG_SOC_NAME == SOC_BK7221U))
+#include "flash_bypass.h"
 #endif
 
 extern void rwnx_cal_initial_calibration(void);
@@ -164,8 +167,13 @@ UINT32 func_init_basic(void)
 {
 #if (!CFG_SUPPORT_RTT)
     intc_init();
-    hal_flash_init();
 #endif
+    hal_flash_init();
+
+#if ((CFG_SOC_NAME == SOC_BK7221U))
+	flash_bypass_operate_sr_init();
+#endif
+
     os_printf("SDK Rev: %s\r\n", BEKEN_SDK_REV);
 
     return 0;

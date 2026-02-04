@@ -68,9 +68,14 @@ EfErrCode easyflash_init(void) {
     extern EfErrCode ef_iap_init(void);
     extern EfErrCode ef_log_init(void);
 
+	static int inited = 0;
+
     size_t default_env_set_size = 0;
     const ef_env *default_env_set;
     EfErrCode result = EF_NO_ERR;
+
+	if (inited)
+		return EF_NO_ERR;
 
     result = ef_port_init(&default_env_set, &default_env_set_size);
 
@@ -99,6 +104,7 @@ EfErrCode easyflash_init(void) {
     }
     EF_INFO("You can get the latest version on https://github.com/armink/EasyFlash .\n");
 
+	inited = 1;
     return result;
 }
 // eof

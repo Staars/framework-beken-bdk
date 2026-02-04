@@ -467,7 +467,6 @@ void store_block (unsigned block, uint8_t *src, unsigned len)
     UINT32 param , or_crc;
     UINT32 param1;
 
-
     TFTP_WARN ("p_len%d \r\n", len);
 
     os_memcpy(&send_hd, src, sizeof(send_hd));

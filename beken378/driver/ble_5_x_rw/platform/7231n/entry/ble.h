@@ -21,6 +21,7 @@ enum
 	BLE_DUT_EXIT,
 	BLE_MSG_SLEEP,
 	BLE_MSG_NULL,
+	BLE_THREAD_EXIT,
 };
 
 enum system_run_mode {

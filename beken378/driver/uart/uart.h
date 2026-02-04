@@ -5,9 +5,9 @@
 #include "fifo.h"
 #include "uart_pub.h"
 
-//#define UART_DEBUG
+#define UART_DEBUG               0     
 
-#ifdef UART_DEBUG
+#if UART_DEBUG
 #define UART_PRT                 os_printf
 #define UART_WPRT                warning_prf
 #else
@@ -40,13 +40,8 @@
 
 #define DEBUG_PRT_MAX_CNT          (16)
 
-#if CFG_UART_DEBUG_COMMAND_LINE
 #define RX_RB_LENGTH               (128)  // 64
 #define TX_RB_LENGTH               (64)
-#else
-#define RX_RB_LENGTH               (64)
-#define TX_RB_LENGTH               (64)
-#endif
 
 #define CARRIAGE_RETURN(buf, count) \
     do { \
@@ -278,7 +273,6 @@ typedef struct _uart_
 /*******************************************************************************
 * Function Declarations
 *******************************************************************************/
-#if CFG_UART_DEBUG_COMMAND_LINE
 extern UINT32 uart_sw_init(UINT8 ch);
 extern UINT32 uart_sw_uninit(UINT8 ch);
 extern void uart_fifo_flush(UINT8 ch);
@@ -299,7 +293,6 @@ extern UINT32 uart2_close(void);
 extern UINT32 uart2_read(char *user_buf, UINT32 count, UINT32 op_flag);
 extern UINT32 uart2_write(char *user_buf, UINT32 count, UINT32 op_flag);
 extern UINT32 uart2_ctrl(UINT32 cmd, void *parm);
-#endif
 
 int uart_read_byte(int uport);
 int uart_write_byte(int uport, char c);

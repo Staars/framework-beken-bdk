@@ -113,7 +113,25 @@ enum sch_arb_elt_asap_phase
  ****************************************************************************************
  */
 
+#define RPA_TAG_TYPE                 (1 << 8)
+#define ADV_TAG_TYPE                 (2 << 8)
+#define ADV_AUX_TAG_TYPE             (3 << 8)
+#define CONN_TAG_TYPE                (4 << 8)
+#define INIT_TAG_TYPE                (5 << 8)
+#define INIT_CODED_TAG_TYPE          (6 << 8)
+#define PER_ADV_TAG_TYPE             (7 << 8)
+#define SCAN_TAG_TYPE                (8 << 8)
+#define SCAN_AUX_TAG_TYPE            (9 << 8)
+#define SCAN_CODED_TAG_TYPE          (10 << 8)
+#define SCAN_CODED_AUX_TAG_TYPE      (11 << 8)
+#define SYNC_TAG_TYPE                (12 << 8)
+#define TEST_TAG_TYPE                (13 << 8)
 
+#define MASK_TAG_TYPE                (0xF << 8)
+
+#define CONN_ROLE_MASTER             (0 << 15)
+#define CONN_ROLE_SLAVE              (1 << 15)
+#define CONN_ROLE_MASK               (1 << 15)
 
 /// Scheduling Arbiter Element
 /*@TRACE*/
@@ -188,6 +206,7 @@ struct sch_arb_elt_tag
 
     /// BK add:For rpa renew event, we do not need rf
     uint8_t rf_flag;
+	uint16_t tag_info;
 
     /************************************************************************************
      * ISR CALLBACKS

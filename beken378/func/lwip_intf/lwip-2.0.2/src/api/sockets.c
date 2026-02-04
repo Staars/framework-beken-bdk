@@ -1324,7 +1324,8 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
   LWIP_DEBUGF(SOCKETS_DEBUG, (" port=%"U16_F"\n", remote_port));
 
   /* make the buffer point to the data that should be sent */
-#if LWIP_NETIF_TX_SINGLE_PBUF
+  /* force malloc buffer to backup data, since beken driver deal data in async mode */
+#if 1//LWIP_NETIF_TX_SINGLE_PBUF
   /* Allocate a new netbuf and copy the data into it. */
   if (netbuf_alloc(&buf, short_size) == NULL) {
     err = ERR_MEM;
@@ -1538,7 +1539,11 @@ int lwip_select(int maxfdp1, fd_set *readset, fd_set *writeset, fd_set *exceptse
                   maxfdp1, (void *)readset, (void *) writeset, (void *) exceptset,
                   timeout ? (s32_t)timeout->tv_sec : (s32_t)-1,
                   timeout ? (s32_t)timeout->tv_usec : (s32_t)-1));
-
+  if(maxfdp1 < 0){
+  	set_errno(EINVAL);
+  	return -1;
+  }
+  
   /* Go through each socket in each list to count number of sockets which
      currently match */
   nready = lwip_selscan(maxfdp1, readset, writeset, exceptset, &lreadset, &lwriteset, &lexceptset);
@@ -1851,18 +1856,7 @@ lwip_shutdown(int s, int how)
   if (!sock) {
     return -1;
   }
-  SOCK_DEINIT_SYNC(sock);
-
-  if (sock->conn != NULL) {
-    if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
-      sock_set_errno(sock, EOPNOTSUPP);
-      return -1;
-    }
-  } else {
-    sock_set_errno(sock, ENOTCONN);
-    return -1;
-  }
-
+  
   if (how == SHUT_RD) {
     shut_rx = 1;
   } else if (how == SHUT_WR) {
@@ -1872,6 +1866,18 @@ lwip_shutdown(int s, int how)
     shut_tx = 1;
   } else {
     sock_set_errno(sock, EINVAL);
+    return -1;
+  }
+  
+  SOCK_DEINIT_SYNC(sock);
+
+  if (sock->conn != NULL) {
+    if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
+      sock_set_errno(sock, EOPNOTSUPP);
+      return -1;
+    }
+  } else {
+    sock_set_errno(sock, ENOTCONN);
     return -1;
   }
   err = netconn_shutdown(sock->conn, shut_rx, shut_tx);
@@ -1889,6 +1895,10 @@ lwip_getaddrname(int s, struct sockaddr *name, socklen_t *namelen, u8_t local)
   u16_t port;
   err_t err;
 
+  if ((NULL == namelen) || (NULL == name)) {
+    return -1;
+  }
+  
   sock = get_socket(s);
   if (!sock) {
     return -1;

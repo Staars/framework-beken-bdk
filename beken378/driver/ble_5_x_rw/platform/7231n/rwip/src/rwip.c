@@ -600,5 +600,10 @@ void rwip_assert(const char * file, int line, int param0, int param1, uint8_t ty
 }
 #endif //RW_DEBUG
 
+unsigned int get_em_map_end(void)
+{
+	return EM_BLE_END;
+}
+
 ///@} RW
 

@@ -336,14 +336,8 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
 
     struct sockaddr_in client_addr;
 
-#if defined(__socklen_t_defined) || defined(_SOCKLEN_T) ||  \
-    defined(_SOCKLEN_T_DECLARED) || defined(__DEFINED_socklen_t)
     socklen_t n = (socklen_t) sizeof( client_addr );
     socklen_t type_len = (socklen_t) sizeof( type );
-#else
-    int n = (int) sizeof( client_addr );
-    int type_len = (int) sizeof( type );
-#endif
 
     /* Is this a TCP or UDP socket? */
     if( getsockopt( bind_ctx->fd, SOL_SOCKET, SO_TYPE,
@@ -454,7 +448,7 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
  */
 //int mbedtls_net_set_block( mbedtls_net_context *ctx )
 //{
-//#if ( defined(_WIN32) || defined(_WIN32_WCE) ) && !defined(EFIX64) && \
+//#if ( defined(_WIN32) || defined(_WIN32_WCE) ) && !defined(EFIX64) &&
 //    !defined(EFI32)
 //    u_long n = 0;
 //    return( ioctlsocket( ctx->fd, FIONBIO, &n ) );
@@ -466,7 +460,7 @@ int mbedtls_net_accept( mbedtls_net_context *bind_ctx,
 
 //int mbedtls_net_set_nonblock( mbedtls_net_context *ctx )
 //{
-//#if ( defined(_WIN32) || defined(_WIN32_WCE) ) && !defined(EFIX64) && \
+//#if ( defined(_WIN32) || defined(_WIN32_WCE) ) && !defined(EFIX64) &&
 //    !defined(EFI32)
 //    u_long n = 1;
 //    return( ioctlsocket( ctx->fd, FIONBIO, &n ) );

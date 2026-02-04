@@ -59,7 +59,13 @@ typedef enum wlan_sta_field {
 	WLAN_STA_FIELD_FREQ,	/* only used in fast connect */
 	WLAN_STA_FIELD_SAE_GROUPS,
 	WLAN_STA_FIELD_MFP,
-
+	WLAN_STA_FIELD_EAP,
+	WLAN_STA_FIELD_IDENTITY,
+	WLAN_STA_FIELD_CA_CERT,
+	WLAN_STA_FIELD_CLIENT_CERT,
+	WLAN_STA_FIELD_PRIVATE_KEY,
+	WLAN_STA_FIELD_PRIVATE_KEY_PASSWD,
+	WLAN_STA_FIELD_PHASE1,
 
 	/* for debug */
 	WLAN_STA_FIELD_DEBUG_LEVEL,
@@ -172,6 +178,15 @@ typedef struct wlan_sta_config {
 
 		int debug_level;
 		int debug_show_keys;
+
+		/* EAP related */
+		char eap[64];
+		char identity[64];
+		char ca_cert[64];
+		char client_cert[64];
+		char private_key[64];
+		char private_key_passwd[64];
+		char phase1[64];		/* phase1 config */
 	} u;
 } wlan_sta_config_t;
 
@@ -243,7 +258,7 @@ typedef struct wlan_gen_psk_param {
  * @brief Wlan WPS pin definition
  */
 typedef struct wlan_sta_wps_pin {
-	uint8_t pin[9];
+	char pin[9];
 } wlan_sta_wps_pin_t;
 
 /**
@@ -399,6 +414,8 @@ typedef struct wlan_ap_config {
  */
 typedef struct wlan_ap_sta {
 	uint8_t addr[6];
+	uint32_t ipaddr;
+	int8_t rssi;
 } wlan_ap_sta_t;
 
 /**
@@ -406,9 +423,14 @@ typedef struct wlan_ap_sta {
  */
 typedef struct wlan_ap_stas {
 	wlan_ap_sta_t *sta;
-	int size;
 	int num;
 } wlan_ap_stas_t;
+
+struct wlan_p2p_connect_param {
+	uint8_t addr[6];
+	int method;
+	int intent;
+};
 
 #ifdef __cplusplus
 }

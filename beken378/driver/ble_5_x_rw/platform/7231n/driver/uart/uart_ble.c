@@ -81,11 +81,11 @@ bool ble_uart_flow_off(void)
 static void ble_uart_send_byte(uint8_t data)
 {
 	data = (data & UART_TX_FIFO_DIN_MASK) << UART_TX_FIFO_DIN_POSI;
-#if (BLE_DUT_UART_PORT == PORT_UART1)
-	REG_WRITE(REG_UART1_FIFO_PORT, data);
-#else
-	REG_WRITE(REG_UART2_FIFO_PORT, data);
-#endif
+	if (uart_print_port == UART1_PORT) {
+		REG_WRITE(REG_UART1_FIFO_PORT, data);
+	} else {
+		REG_WRITE(REG_UART2_FIFO_PORT, data);
+	}
 }
 
 void ble_uart_send(void *buff, uint16_t len)
@@ -183,30 +183,29 @@ void  ble_uart_isr(void)
 	UINT32 status;
 	UINT32 intr_en;
 	UINT32 intr_status;
+	UINT32 fifo_status_reg;
 
-#if (BLE_DUT_UART_PORT == PORT_UART1)
-	intr_en = REG_READ(REG_UART1_INTR_ENABLE);
-	intr_status = REG_READ(REG_UART1_INTR_STATUS);
-	REG_WRITE(REG_UART1_INTR_STATUS, intr_status);
-#else
-	intr_en = REG_READ(REG_UART2_INTR_ENABLE);
-	intr_status = REG_READ(REG_UART2_INTR_STATUS);
-	REG_WRITE(REG_UART2_INTR_STATUS, intr_status);
-#endif
+	if (uart_print_port == UART1_PORT) {
+		intr_en = REG_READ(REG_UART1_INTR_ENABLE);
+		intr_status = REG_READ(REG_UART1_INTR_STATUS);
+		REG_WRITE(REG_UART1_INTR_STATUS, intr_status);
+        fifo_status_reg = REG_UART1_FIFO_STATUS;
+	} else {
+		intr_en = REG_READ(REG_UART2_INTR_ENABLE);
+		intr_status = REG_READ(REG_UART2_INTR_STATUS);
+		REG_WRITE(REG_UART2_INTR_STATUS, intr_status);
+        fifo_status_reg = REG_UART2_FIFO_STATUS;
+	}
 	status = intr_status & intr_en;
 
 	if (status & (RX_FIFO_NEED_READ_STA | UART_RX_STOP_END_STA)) {
-#if (BLE_DUT_UART_PORT == PORT_UART1)
-		while(REG_READ(REG_UART1_FIFO_STATUS) & FIFO_RD_READY)
-#else
-		while(REG_READ(REG_UART2_FIFO_STATUS) & FIFO_RD_READY)
-#endif
+		while(REG_READ(fifo_status_reg) & FIFO_RD_READY)
 		{
-#if (BLE_DUT_UART_PORT == PORT_UART1)
-			uart_rx_buf[uart_rx_index] = ((REG_READ(REG_UART1_FIFO_PORT) >> UART_RX_FIFO_DOUT_POSI) & UART_RX_FIFO_DOUT_MASK);
-#else
-			uart_rx_buf[uart_rx_index] = ((REG_READ(REG_UART2_FIFO_PORT) >> UART_RX_FIFO_DOUT_POSI) & UART_RX_FIFO_DOUT_MASK);
-#endif
+			if (uart_print_port == UART1_PORT) {
+				uart_rx_buf[uart_rx_index] = ((REG_READ(REG_UART1_FIFO_PORT) >> UART_RX_FIFO_DOUT_POSI) & UART_RX_FIFO_DOUT_MASK);
+			} else {
+				uart_rx_buf[uart_rx_index] = ((REG_READ(REG_UART2_FIFO_PORT) >> UART_RX_FIFO_DOUT_POSI) & UART_RX_FIFO_DOUT_MASK);
+			}
 			uart_rx_index++;
 			if (uart_rx_index == UART_FIFO_MAX_COUNT) {
 				uart_rx_index = 0;

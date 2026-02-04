@@ -1,12 +1,9 @@
 #include "include.h"
 #include "arm_arch.h"
-
 #include "sys_ctrl_pub.h"
 #include "sys_ctrl.h"
 #include "target_util_pub.h"
-
 #include "drv_model_pub.h"
-
 #include "uart_pub.h"
 #include "flash_pub.h"
 #include "power_save_pub.h"
@@ -23,6 +20,7 @@
 #include "start_type_pub.h"
 #include "ap_idle_pub.h"
 #include "bk7011_cal_pub.h"
+
 #if CFG_SUPPORT_BLE && CFG_USE_BLE_PS
 #include "ble_pub.h"
 #endif
@@ -117,9 +115,11 @@ void sctrl_cali_dpll(UINT8 flag)
     UINT32 param;
 
 #if (CFG_SOC_NAME == SOC_BK7231N)
-    extern void bk7011_update_tx_power_when_cal_dpll(int start_or_stop);
+    UINT32 trx_0xc = 0;
+    UINT32 pwtbl_0x34 = 0;
+    extern void bk7011_update_tx_power_when_cal_dpll(int start_or_stop, UINT32 *trx_0xc, UINT32 *pwtbl_0x34);
 
-	bk7011_update_tx_power_when_cal_dpll(1);
+    bk7011_update_tx_power_when_cal_dpll(1, &trx_0xc, &pwtbl_0x34);
 #endif
     param = sctrl_analog_get(SCTRL_ANALOG_CTRL0);
     param &= ~(SPI_TRIG_BIT);
@@ -147,7 +147,7 @@ void sctrl_cali_dpll(UINT8 flag)
     sctrl_analog_set(SCTRL_ANALOG_CTRL0, param);
 
 #if (CFG_SOC_NAME == SOC_BK7231N)
-    bk7011_update_tx_power_when_cal_dpll(0);
+    bk7011_update_tx_power_when_cal_dpll(0, &trx_0xc, &pwtbl_0x34);
 #endif
 }
 
@@ -560,6 +560,28 @@ static void sctrl_rf_init(void)
     rf_sleeped = 0;
 }
 
+#if ((CFG_SOC_NAME == SOC_BK7221U) || (CFG_SOC_NAME == SOC_BK7231N))
+void sctrl_flash_select_flash_controller(void)
+{
+	UINT32 reg;
+
+	reg = REG_READ(SCTRL_CONTROL);
+	reg &= ~(FLASH_SPI_MUX_BIT);
+
+	REG_WRITE(SCTRL_CONTROL, reg);
+}
+
+void sctrl_flash_select_spi_controller(void)
+{
+	UINT32 reg;
+
+	reg = REG_READ(SCTRL_CONTROL);
+	reg |= FLASH_SPI_MUX_BIT;
+
+	REG_WRITE(SCTRL_CONTROL, reg);
+}
+#endif
+
 void ps_delay(volatile UINT16 times)
 {
 	volatile UINT32	delay = times;
@@ -652,7 +674,7 @@ void sctrl_hw_sleep(UINT32 peri_clk)
     	REG_WRITE(ICU_ARM_WAKEUP_EN, reg);
     }
 
-    #if CFG_USE_BLE_PS
+    #if CFG_SUPPORT_BLE && CFG_USE_BLE_PS
     if(if_ble_sleep())
     {
         reg = REG_READ(ICU_ARM_WAKEUP_EN);
@@ -676,8 +698,7 @@ void sctrl_hw_sleep(UINT32 peri_clk)
         /* MCLK(main clock) select:dco*/
         reg = REG_READ(SCTRL_CONTROL);
         reg &= ~(MCLK_DIV_MASK << MCLK_DIV_POSI);
-        REG_WRITE(SCTRL_CONTROL, reg);
-        reg = REG_READ(SCTRL_CONTROL);
+        reg |= ((MCLK_DIV_1 & MCLK_DIV_MASK) << MCLK_DIV_POSI);
         reg &= ~(MCLK_MUX_MASK << MCLK_MUX_POSI);
         REG_WRITE(SCTRL_CONTROL, reg);
         PS_DEBUG_DOWN_TRIGER;
@@ -768,9 +789,6 @@ void sctrl_hw_wakeup(void)
         reg = REG_READ(SCTRL_CONTROL);
         reg &= ~(MCLK_DIV_MASK << MCLK_DIV_POSI);
         reg |= ((MCLK_DIV_7 & MCLK_DIV_MASK) << MCLK_DIV_POSI);
-        REG_WRITE(SCTRL_CONTROL, reg);
-
-        reg = REG_READ(SCTRL_CONTROL);
         reg &= ~(MCLK_MUX_MASK << MCLK_MUX_POSI);
         reg |= ((MCLK_FIELD_DPLL & MCLK_MUX_MASK) << MCLK_MUX_POSI);
         REG_WRITE(SCTRL_CONTROL, reg);
@@ -921,6 +939,7 @@ static void sctrl_rf_wakeup(void)
 			sctrl_fix_dpll_div();
 		}
 			phy_wakeup_rf_reinit();
+			phy_wakeup_wifi_reinit();
 #endif
 
 			rf_sleeped = 0;
@@ -1000,7 +1019,9 @@ UINT8 sctrl_if_mcu_can_sleep(void)
 {
     return (((! bk_wlan_has_role(VIF_STA))
         || power_save_if_rf_sleep())
+#if CFG_SUPPORT_BLE && CFG_USE_BLE_PS
     	&& if_ble_sleep()
+#endif
     	&& ap_if_ap_rf_sleep()
     	&& sctrl_if_rf_sleep()
         && (sctrl_mcu_ps_info.hw_sleep == 0));
@@ -2492,8 +2513,6 @@ static int sctrl_write_efuse(void *param)
 wr_exit:
 	return ret;
 }
-
-
 #endif // (CFG_SOC_NAME != SOC_BK7231)
 
 #if CFG_USE_USB_CHARGE

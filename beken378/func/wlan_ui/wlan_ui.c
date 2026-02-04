@@ -1,5 +1,4 @@
 #include "include.h"
-#include "wlan_ui_pub.h"
 #include "rw_pub.h"
 #include "vif_mgmt.h"
 #include "sa_station.h"
@@ -47,6 +46,10 @@
 #include "role_launch.h"
 #endif
 
+#if (FAST_CONNECT_INFO_ENC_METHOD != ENC_METHOD_NULL)
+#include "soft_encrypt.h"
+#endif
+
 #if CFG_SUPPORT_OTA_HTTP
 #include "utils_httpc.h"
 #endif
@@ -54,7 +57,11 @@
 #include "bk7011_cal_pub.h"
 #include "target_util_pub.h"
 #include "wlan_ui_pub.h"
-
+#if CFG_WIFI_P2P_GO
+#include "video_demo_pub.h"
+#include "rw_tx_buffering.h"
+#include "rw_ieee80211.h"
+#endif
 
 monitor_cb_t g_monitor_cb = 0;
 unsigned char g_monitor_is_not_filter = 0;
@@ -426,7 +433,7 @@ void bk_wlan_ap_init(network_InitTypeDef_st *inNetworkInitPara)
 #endif
 
     bk_wlan_ap_set_channel_config(bk_wlan_ap_get_default_channel());
-	
+
     if(!g_wlan_general_param)
     {
         g_wlan_general_param = (general_param_t *)os_zalloc(sizeof(general_param_t));
@@ -635,6 +642,71 @@ void bk_wlan_sta_init(network_InitTypeDef_st *inNetworkInitPara)
 }
 
 #if CFG_WPA_CTRL_IFACE && CFG_WLAN_FAST_CONNECT
+#if (FAST_CONNECT_INFO_ENC_METHOD == ENC_METHOD_XOR)
+void fc_info_enc(struct wlan_fast_connect_info *fci)
+{
+	struct wlan_fast_connect_info tmp_out;
+	GLOBAL_INT_DECLARATION();
+
+	GLOBAL_INT_DISABLE();
+	xor_enc(fci, &tmp_out, sizeof(tmp_out));
+	os_memcpy(fci, &tmp_out, sizeof(tmp_out));
+	GLOBAL_INT_RESTORE();
+}
+
+void fc_info_dec(struct wlan_fast_connect_info *fci)
+{
+	struct wlan_fast_connect_info tmp_out;
+	GLOBAL_INT_DECLARATION();
+
+	GLOBAL_INT_DISABLE();
+	xor_dec(fci, &tmp_out, sizeof(tmp_out));
+	os_memcpy(fci, &tmp_out, sizeof(tmp_out));
+	GLOBAL_INT_RESTORE();
+}
+#elif (FAST_CONNECT_INFO_ENC_METHOD == ENC_METHOD_AES)
+void fc_info_enc(struct wlan_fast_connect_info *fci)
+{
+	struct wlan_fast_connect_info tmp_out;
+    weeny_aes_context ctx;
+    uint8_t iv[BK_AES_IV_LEN + 1];
+    uint8_t private_key[BK_AES_KEY_LEN + 1];
+	GLOBAL_INT_DECLARATION();
+
+	GLOBAL_INT_DISABLE();
+    memcpy(iv, BK_TINY_AES_IV, strlen(BK_TINY_AES_IV));
+    iv[sizeof(iv) - 1] = '\0';
+    memcpy(private_key, BK_TINY_AES_KEY, strlen(BK_TINY_AES_KEY));
+    private_key[sizeof(private_key) - 1] = '\0';
+
+    memset(&tmp_out, 0x0, sizeof(tmp_out));
+    weeny_aes_setkey_enc(&ctx, (uint8_t *) private_key, 256);
+    weeny_aes_crypt_cbc(&ctx, AES_ENCRYPT, sizeof(tmp_out), iv, (unsigned char *)fci, (unsigned char *)&tmp_out);
+	os_memcpy(fci, &tmp_out, sizeof(tmp_out));
+	GLOBAL_INT_RESTORE();
+}
+
+void fc_info_dec(struct wlan_fast_connect_info *fci)
+{
+	struct wlan_fast_connect_info tmp_out;
+	weeny_aes_context ctx;
+	uint8_t iv[BK_AES_IV_LEN + 1];
+	uint8_t private_key[BK_AES_KEY_LEN + 1];
+	GLOBAL_INT_DECLARATION();
+
+	GLOBAL_INT_DISABLE();
+	memcpy(iv, BK_TINY_AES_IV, strlen(BK_TINY_AES_IV));
+	iv[sizeof(iv) - 1] = '\0';
+	memcpy(private_key, BK_TINY_AES_KEY, strlen(BK_TINY_AES_KEY));
+	private_key[sizeof(private_key) - 1] = '\0';
+
+	memset(&tmp_out, 0x0, sizeof(tmp_out));
+	weeny_aes_setkey_dec(&ctx, (uint8_t *) private_key, 256);
+	weeny_aes_crypt_cbc(&ctx, AES_DECRYPT, sizeof(tmp_out), iv, (unsigned char *)fci, (unsigned char *)&tmp_out);
+	os_memcpy(fci, &tmp_out, sizeof(tmp_out));
+	GLOBAL_INT_RESTORE();
+}
+#endif
 
 #define BSSID_INFO_ADDR            0x1e2000 /*reserve 4k for bssid info*/
 
@@ -646,6 +718,10 @@ void wlan_read_fast_connect_info(struct wlan_fast_connect_info *fci)
 	flash_hdl = ddev_open(FLASH_DEV_NAME, (UINT32*)&status, 0);
 	addr = BSSID_INFO_ADDR;
 	ddev_read(flash_hdl, (char *)fci, sizeof(*fci), addr);
+
+#if (FAST_CONNECT_INFO_ENC_METHOD != ENC_METHOD_NULL)
+	fc_info_dec(fci);
+#endif
 	ddev_close(flash_hdl);
 }
 
@@ -653,7 +729,7 @@ void wlan_write_fast_connect_info(struct wlan_fast_connect_info *fci)
 {
 	uint32_t status, addr;
 	struct wlan_fast_connect_info pre_fci;
-	uint8_t protect_flag, protect_param;
+	uint32_t protect_flag, protect_param;
 	DD_HANDLE flash_hdl;
 
 	/* obtain the previous bssid info*/
@@ -672,6 +748,10 @@ void wlan_write_fast_connect_info(struct wlan_fast_connect_info *fci)
 
 	addr = BSSID_INFO_ADDR;
 	ddev_control(flash_hdl, CMD_FLASH_ERASE_SECTOR, (void *)&addr);
+
+#if (FAST_CONNECT_INFO_ENC_METHOD != ENC_METHOD_NULL)
+	fc_info_enc(fci);
+#endif
 
 	ddev_write(flash_hdl, (char*)fci, sizeof(*fci), addr);
 
@@ -774,7 +854,23 @@ OSStatus bk_wlan_start_sta(network_InitTypeDef_st *inNetworkInitPara)
 	wlan_sta_enable();
 
 	/* set network parameters: ssid, passphase */
-	wlan_sta_set((uint8_t *)inNetworkInitPara->wifi_ssid, os_strlen(inNetworkInitPara->wifi_ssid), (uint8_t *)inNetworkInitPara->wifi_key);
+	wlan_sta_set((uint8_t *)inNetworkInitPara->wifi_ssid,
+			os_strlen(inNetworkInitPara->wifi_ssid),
+			(uint8_t *)inNetworkInitPara->wifi_key);
+
+#if CFG_SUPPORT_BSSID_CONNECT
+	/* set bssid */
+	if (!is_zero_ether_addr((u8 *)inNetworkInitPara->wifi_bssid) &&
+		!is_broadcast_ether_addr((u8 *)inNetworkInitPara->wifi_bssid)) {
+
+		wlan_sta_config_t config;
+
+		os_memset(&config, 0, sizeof(config));
+		os_memcpy(config.u.bssid, inNetworkInitPara->wifi_bssid, ETH_ALEN);
+		config.field = WLAN_STA_FIELD_BSSID;
+		wpa_ctrl_request(WPA_CTRL_CMD_STA_SET, &config);
+	}
+#endif
 
 	/* connect to AP */
 	wlan_sta_connect(chan);
@@ -793,6 +889,111 @@ OSStatus bk_wlan_start_sta(network_InitTypeDef_st *inNetworkInitPara)
 
     return kNoErr;
 }
+
+#if CFG_WIFI_P2P_GO
+beken_queue_t  go_msg_queue;
+void app_p2p_rw_event_func(void *new_evt)
+{
+	DRONE_MSG_T msg;
+	rw_evt_type evt_type = *((rw_evt_type *)new_evt);
+
+	msg.dmsg = evt_type;
+	rtos_push_to_queue(&go_msg_queue, &msg, BEKEN_NO_WAIT);
+}
+
+int app_deinit_go(void)
+{
+	OSStatus ret = 0;
+	DRONE_MSG_T msg;
+
+	ret = rtos_init_queue(&go_msg_queue,
+				"app_demo_p2p_cancel,queue",
+                              sizeof(DRONE_MSG_T),
+                              1);
+
+	while(1) {
+		ret = rtos_pop_from_queue(&go_msg_queue, &msg, BEKEN_WAIT_FOREVER);
+		if (msg.dmsg == RW_EVT_AP_DISCONNECTED) {
+#if CFG_TX_BUFING
+			rwm_tx_bufing_reinit(false);
+#endif
+			rwnx_hw_reinit();
+			uap_ip_down();
+			wlan_p2p_cancel();
+			wlan_p2p_find();
+		}
+#if CFG_TX_BUFING
+		else if (msg.dmsg == RW_EVT_AP_CONNECTED ||
+				msg.dmsg == RW_EVT_STA_GOT_IP)
+			rwm_tx_bufing_reinit(true);
+#endif
+		else if (msg.dmsg == RW_EVT_STA_DISCONNECTED) {
+#if CFG_TX_BUFING
+			rwm_tx_bufing_reinit(false);
+#endif
+			rwnx_hw_reinit();
+		}
+	}
+
+	return ret;
+}
+
+
+beken_thread_t p2p_restart_thread_hdl;
+void app_p2p_restart_thread(void)
+{
+	 rtos_create_thread(&p2p_restart_thread_hdl,
+                                 BEKEN_DEFAULT_WORKER_PRIORITY,
+                                 "app_deinit_go_thread",
+                                 (beken_thread_function_t)app_deinit_go,
+                                 2048,
+                                 (beken_thread_arg_t)NULL);
+}
+#endif
+
+OSStatus bk_wlan_start_p2p(network_InitTypeDef_st *inNetworkInitPara)
+{
+//	size_t psk_len = 0;
+//	u8 *psk = 0;
+
+#if CFG_WPA_CTRL_IFACE
+
+#if CFG_WLAN_FAST_CONNECT
+	struct wlan_fast_connect_info fci;
+	int ssid_len, req_ssid_len;
+#endif
+//	int chan = 0;
+
+	/* diconnect previous connection if may */
+	sta_ip_down();	// XXX: WLAN_DISCONNECT_EVENT may handle this
+	wlan_sta_disconnect();
+#else /* !CFG_WPA_CTRL_IFACE */
+#if CFG_ROLE_LAUNCH
+	rl_status_set_st_state(RL_ST_STATUS_RESTART_ST);
+#endif
+    bk_wlan_stop(BK_STATION);
+#endif
+
+  //  mhdr_set_station_status(RW_EVT_STA_CONNECTING);
+#if CFG_ROLE_LAUNCH
+	rl_status_reset_st_state(RL_ST_STATUS_RESTART_HOLD | RL_ST_STATUS_RESTART_ST);
+#endif
+
+#if (RF_USE_POLICY == BLE_DEFAULT_WIFI_REQUEST)
+    wifi_station_status_event_notice(0,RW_EVT_STA_CONNECTING);
+#endif
+
+	os_printf("%s\n", __func__);
+    bk_wlan_sta_init(inNetworkInitPara);
+	wlan_sta_enable();
+
+#if CFG_WIFI_P2P
+	wlan_p2p_find();
+#endif
+
+    return kNoErr;
+}
+
 
 OSStatus bk_wlan_start(network_InitTypeDef_st *inNetworkInitPara)
 {
@@ -829,6 +1030,18 @@ OSStatus bk_wlan_start(network_InitTypeDef_st *inNetworkInitPara)
         #else
         bk_wlan_start_sta(inNetworkInitPara);
         #endif
+    }
+    else if(inNetworkInitPara->wifi_mode == BK_P2P)
+    {
+	#if CFG_ROLE_LAUNCH
+        lreq.req_type = LAUNCH_REQ_STA;
+        lreq.descr = *inNetworkInitPara;
+
+		rl_status_reset_private_state(RL_PRIV_STATUS_STA_ADV);
+        rl_sta_request_enter(&lreq, 0);
+	#else
+        bk_wlan_start_p2p(inNetworkInitPara);
+	#endif
     }
 
     return 0;
@@ -1891,6 +2104,11 @@ int bk_wlan_dtim_rf_ps_mode_do_wakeup()
     }
 #endif
 
+#if CFG_WIFI_P2P
+	if(bk_wlan_has_role(VIF_AP))
+		return 0;	
+#endif
+
     void *sem_list = NULL;
 	UINT32 ret = 0;
 
@@ -2242,8 +2460,6 @@ void bk_wifi_get_softap_mac_address(char *mac)
 }
 
 #if (CFG_SUPPORT_ALIOS)
-/**********************for alios*******************************/
-
 void bk_wifi_get_mac_address(char *mac)
 {
 	wifi_get_mac_address(mac, CONFIG_ROLE_STA);

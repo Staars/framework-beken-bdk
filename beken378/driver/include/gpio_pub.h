@@ -8,14 +8,20 @@
 #define GPIO_FAILURE                (1)
 #define GPIO_SUCCESS                (0)
 
+enum {
+	GPIO_DIR_INPUT = 0,
+	GPIO_DIR_OUTPUT,
+	GPIO_DIR_OTHER
+};
+
 #define GPIO_DEV_NAME                "gpio"
 
 #define GPIO_CFG_PARAM(id, mode)           (id + ((mode & 0xff) << 8))
-#define GPIO_CFG_PARAM_DEMUX_ID(param)      (param & 0xff)
+#define GPIO_CFG_PARAM_DEMUX_ID(param)       (param & 0xff)
 #define GPIO_CFG_PARAM_DEMUX_MODE(param)    ((param >> 8) & 0xff)
 
 #define GPIO_OUTPUT_PARAM(id, val)           (id + ((val & 0xff) << 8))
-#define GPIO_OUTPUT_DEMUX_ID(param)          (param & 0xff)
+#define GPIO_OUTPUT_DEMUX_ID(param)           (param & 0xff)
 #define GPIO_OUTPUT_DEMUX_VAL(param)         ((param >> 8) & 0xff)
 
 
@@ -141,16 +147,18 @@ enum
     GFUNC_MODE_BT_PRIORITY,
     GFUNC_MODE_UART1,
     GFUNC_MODE_SD_DMA,
-    GFUNC_MODE_SD_HOST,    
-    GFUNC_MODE_SPI_DMA, 
-    GFUNC_MODE_SPI,    
-    GFUNC_MODE_PWM4,    
-    GFUNC_MODE_PWM5,    
-    GFUNC_MODE_I2C1,    
-    GFUNC_MODE_JTAG,    
-    GFUNC_MODE_CLK26M,    
+    GFUNC_MODE_SD_HOST,
+    GFUNC_MODE_SPI_DMA,
+    GFUNC_MODE_SPI,
+    GFUNC_MODE_SPI_GPIO_14,
+    GFUNC_MODE_SPI_GPIO_16_17,
+    GFUNC_MODE_PWM4,
+    GFUNC_MODE_PWM5,
+    GFUNC_MODE_I2C1,
+    GFUNC_MODE_JTAG,
+    GFUNC_MODE_CLK26M,
     GFUNC_MODE_ADC3,
-    GFUNC_MODE_DCMI,	
+    GFUNC_MODE_DCMI,
     GFUNC_MODE_ADC4,
     GFUNC_MODE_ADC5,
     GFUNC_MODE_ADC6,
@@ -164,6 +172,8 @@ enum
     GFUNC_MODE_QSPI_CLK,
     GFUNC_MODE_QSPI_CSN,
     GFUNC_MODE_IRDA,
+    GFUNC_MODE_TXEN,
+    GFUNC_MODE_RXEN,
 };
 
 enum
@@ -178,9 +188,9 @@ typedef struct gpio_int_st
 {
 	UINT32 id;
 	UINT32 mode;
-	void * phandler;
+	void *phandler;
 }GPIO_INT_ST;
-				
+
 __inline static void bk_gpio_config_input(GPIO_INDEX id)
 {
     UINT32 ret;
@@ -286,11 +296,14 @@ extern UINT32 gpio_ctrl(UINT32 cmd, void *param);
 extern UINT32 gpio_input(UINT32 id);
 extern void gpio_init(void);
 extern void gpio_exit(void);
-void gpio_int_disable(UINT32 index);
-void gpio_int_enable(UINT32 index, UINT32 mode, void (*p_Int_Handler)(unsigned char));
-void gpio_config( UINT32 index, UINT32 mode ) ;
-void gpio_output(UINT32 id, UINT32 val);
-
+extern UINT32 gpio_get_config(UINT32 index, UINT32 *mode);
+extern void gpio_int_disable(UINT32 index);
+extern void gpio_int_enable(UINT32 index, UINT32 mode, void (*p_Int_Handler)(unsigned char));
+extern void gpio_config( UINT32 index, UINT32 mode ) ;
+extern void gpio_output(UINT32 id, UINT32 val);
+extern void gpio_get_output(UINT32 id, UINT32 *val);
+extern void gpio_get_dir(UINT32 id, UINT32 *val);
+extern void gpio_int_mask(UINT32 id, UINT32 mask);
 #endif // _GPIO_PUB_H_
 
 // EOF

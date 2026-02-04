@@ -22,14 +22,8 @@
 * @{
 ****************************************************************************************
 */
-
-
 #include <stddef.h>     // standard definition
-
 #include "driver_sys_ctrl.h"
-
-
-
 
 void DelayNops(volatile unsigned long nops)
 {
@@ -38,19 +32,16 @@ void DelayNops(volatile unsigned long nops)
     }
 }
 
-
 void DelayUS(volatile unsigned long timesUS)
 {
 	volatile unsigned long i;
 
-	//unsigned long tick_cnt = 8;          // 24MHz, DelayUS(1000) DelayUS(1) = 1.052us
 	#if (MCU_CLK == MCU_CLK_26MHz)
-	//unsigned long tick_cnt_us = 3;       // 26MHz, DelayUS(1000) DelayUS(1) = 1.028us
 	#define tick_cnt_us         3
 	#elif (MCU_CLK == MCU_CLK_120MHz)		/* #if (MCU_CLK == MCU_CLK_26MHz) */
 	#define tick_cnt_us         28
 	#endif		/* #if (MCU_CLK == MCU_CLK_26MHz) */
-//    printf("tick_cnt = 0x%x\r\n", tick_cnt);
+
     while (timesUS --)
 	{
 		i = 0;
@@ -60,7 +51,6 @@ void DelayUS(volatile unsigned long timesUS)
 		}
 	}
 }
-
 
 // set CPU clk to DPLL
 void set_CPU_clk_DPLL(void)
@@ -72,7 +62,6 @@ void set_CPU_clk_DPLL(void)
 
     REG_SYS_CTRL_ANALOG_REG0 = 0x0819A54B;
     REG_SYS_CTRL_ANALOG_REG1 = 0x6AC03102;
-//    REG_SYS_CTRL_ANALOG_REG2 = 0x24006000;
     REG_SYS_CTRL_ANALOG_REG2 = 0x27006000;
     REG_SYS_CTRL_ANALOG_REG3 = 0x4FE06C50;
     REG_SYS_CTRL_ANALOG_REG4 = 0x59E04520;

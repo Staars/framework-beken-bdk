@@ -23,8 +23,10 @@ typedef float         		  FP32;			/* Single precision floating point */
 typedef double         		  FP64;			/* Double precision floating point */
 typedef unsigned int          size_t;
 typedef unsigned char         BOOLEAN;
+
+#if (CFG_OS_FREERTOS) || (CFG_SUPPORT_RTT) || (CFG_SUPPORT_ALIOS)
 typedef unsigned char         BOOL;
-//typedef unsigned char         bool;
+#endif
 
 #define LPVOID              void *
 #define VOID                void

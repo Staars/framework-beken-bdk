@@ -10,7 +10,6 @@
 #include "wlan_cli_pub.h"
 #include "arm_mcu_pub.h"
 #include "BkDriverPwm.h"
-#include "lwip/ping.h"
 #include "ble_pub.h"
 #include "sensor.h"
 #include "spi_pub.h"
@@ -19,13 +18,14 @@
 #include "BkDriverPwm.h"
 #include "saradc_intf.h"
 #include "drv_model_pub.h"
+#include "BkDriverGpio.h"
 
 #define BK_LOGW( tag, format, ... ) os_printf(format, ##__VA_ARGS__)
 #define BK_LOGI( tag, format, ... ) os_printf(format, ##__VA_ARGS__)
 #define BK_LOGD( tag, format, ... ) os_printf(format, ##__VA_ARGS__)
 #define BK_LOGV( tag, format, ... ) os_printf(format, ##__VA_ARGS__)
 
-#define CFG_LOG_LEVEL			BK_LOG_NONE
+#define CFG_LOG_LEVEL			BK_LOG_DEBUG
 
 #define PERI_LOGI				BK_LOGI
 #define PERI_LOGW				BK_LOGW
@@ -315,7 +315,12 @@ void gspi_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 		max_hz = atoi(argv[3]);//SPI_BAUDRATE;
 
 		bk_printf("spi master  dma tx: tx_len:%d max_hz:%d\r\n", tx_len, max_hz);
-
+#if (SPI_LINE_MODE == SPI_USE_3_LINE)
+		BkGpioInitialize(15, OUTPUT_NORMAL);
+		BkGpioInitialize(6, OUTPUT_NORMAL);
+		BkGpioOutputLow(15);
+		BkGpioOutputLow(6);
+#endif
 		buf = os_malloc(tx_len * sizeof(UINT8));
 		if (!buf) {
 			bk_printf("spi test malloc buf fail\r\n");
@@ -340,6 +345,10 @@ void gspi_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 		if (ret)
 			bk_printf("spi dma send error%d\r\n", ret);
 		else {
+#if (SPI_LINE_MODE == SPI_USE_3_LINE)
+			BkGpioOutputHigh(15);
+			BkGpioOutputHigh(6);
+#endif
 			for (int i = 0; i < tx_len; i++) {
 				bk_printf("%02x,", buf[i]);
 				if ((i + 1) % 32 == 0)
@@ -529,6 +538,9 @@ void gspi_test(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 
 
 uint32 spi_dma_slave_rx_thread_main(void);
+uint32 spi_dma_master_tx_thread_main(void);
+uint32 spi_dma_master_tx_loop_stop(void);
+uint32 spi_dma_slave_rx_loop_stop(void);
 
 void spi_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv)
 {
@@ -541,6 +553,20 @@ void spi_Command(char *pcWriteBuffer, int xWriteBufferLen, int argc, char **argv
 	{
 		bk_printf("spi dma rx loop test\r\n");
 		spi_dma_slave_rx_thread_main();
+	}
+	else if (os_strcmp(argv[1], "master_tx_loop") == 0){
+
+		bk_printf("spi dma tx loop test\r\n");
+		spi_dma_master_tx_thread_main();
+	}
+	else if (os_strcmp(argv[1], "master_tx_stop") == 0){
+
+		bk_printf("spi dma tx stop loop\r\n");
+		spi_dma_master_tx_loop_stop();
+	}else if (os_strcmp(argv[1], "slave_rx_stop") == 0){
+
+		bk_printf("spi dma slave rx stop loop\r\n");
+		spi_dma_slave_rx_loop_stop();
 	}
 }
 

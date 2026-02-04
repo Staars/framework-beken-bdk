@@ -6,13 +6,17 @@
 #include "drv_model_pub.h"
 #include "uart_pub.h"
 #include "rtos_pub.h"
+#include "power_save_pub.h"
+#include "mcu_ps_pub.h"
+#include "BkDriverWdg.h"
 
 #if (CFG_SUPPORT_ALIOS)
 #include "k_api.h"
 #endif
-#include "power_save_pub.h"
-#include "mcu_ps_pub.h"
-#include "BkDriverWdg.h"
+
+#if CFG_SUPPORT_LITEOS
+#include "bk_los_timer.h"
+#endif
 
 static volatile UINT64 current_clock = 0;
 static volatile UINT32 current_seconds = 0;
@@ -29,12 +33,10 @@ extern void preempt_delayed_schedule_clear_flag(void);
 static inline UINT64 fclk_freertos_get_tick64(void);
 
 #if (CFG_OS_FREERTOS)
-
 #define INT_WDG_FEED_PERIOD_TICK ((BK_MS_TO_TICKS(CFG_INT_WDG_PERIOD_MS)) >> 4)
 #define TASK_WDG_PERIOD_TICK (BK_MS_TO_TICKS(CFG_TASK_WDG_PERIOD_MS))
 
 #if (CFG_INT_WDG_ENABLED)
-
 void int_watchdog_feed(void)
 {
         static UINT64 s_last_int_wdg_feed = 0;
@@ -116,7 +118,7 @@ void fclk_hdl(UINT8 param)
 #endif
 }
 
-#if !(CFG_SUPPORT_RTT || CFG_SUPPORT_ALIOS)
+#if !(CFG_SUPPORT_RTT || CFG_SUPPORT_ALIOS || CFG_SUPPORT_LITEOS)
 static UINT32 fclk_freertos_update_tick(UINT32 tick)
 {
     current_clock += tick;
@@ -147,7 +149,7 @@ UINT32 fclk_update_tick(UINT32 tick)
     rtt_update_tick(tick);
 #elif (CFG_SUPPORT_ALIOS)
     krhino_update_sys_tick((UINT64)tick);
-#else
+#elif CFG_OS_FREERTOS
     GLOBAL_INT_DECLARATION();
 
     if(tick == 0)
@@ -180,6 +182,8 @@ UINT64 fclk_get_tick(void)
     fclk = (UINT64)rt_tick_get();
 #elif (CFG_SUPPORT_ALIOS)
     fclk = krhino_sys_tick_get();
+#elif CFG_SUPPORT_LITEOS
+	return rtos_get_tick_count();
 #else
     fclk = fclk_freertos_get_tick32();
 #endif
@@ -192,6 +196,8 @@ UINT32 fclk_get_second(void)
     return (rt_tick_get()/FCLK_SECOND);
 #elif (CFG_SUPPORT_ALIOS)
     return (krhino_sys_tick_get()/FCLK_SECOND);
+#elif CFG_SUPPORT_LITEOS
+	return OsGetCurrSecond();
 #else
     return fclk_freertos_get_tick32()/FCLK_SECOND;
 #endif

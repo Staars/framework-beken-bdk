@@ -37,6 +37,7 @@ static int sdp_default_msg_handler(kernel_msg_id_t const msgid,
 	bk_printf("conidx:%x\r\n",conidx);
 #endif
 	return (KERNEL_MSG_CONSUMED);
+	(void)conidx;
 }
 /*
 * TYPE DEFINITIONS
@@ -306,7 +307,7 @@ static int sdp_task_gattc_cmp_evt_handler(kernel_msg_id_t const msgid,
 								 kernel_task_id_t const dest_id,
 								 kernel_task_id_t const src_id)
 {
-	uint8_t state = kernel_state_get(dest_id);
+	///uint8_t state = kernel_state_get(dest_id);
 	uint8_t conhdl = KERNEL_IDX_GET(src_id);
 	uint8_t conidx = app_ble_find_conn_idx_handle(conhdl);
 
@@ -342,7 +343,7 @@ static int sdp_task_gattc_read_ind_handler(kernel_msg_id_t const msgid,
 										kernel_task_id_t const dest_id,
 										kernel_task_id_t const src_id)
 {
-	uint8_t state = kernel_state_get(dest_id);
+	///uint8_t state = kernel_state_get(dest_id);
 	uint8_t conhdl = KERNEL_IDX_GET(src_id);
 	uint8_t conidx = app_ble_find_conn_idx_handle(conhdl);
 
@@ -379,7 +380,7 @@ static int sdp_gattc_event_ind_handler(kernel_msg_id_t const msgid,
 								   kernel_task_id_t const dest_id,
 								   kernel_task_id_t const src_id)
 {
-	uint8_t state = kernel_state_get(dest_id);
+	///uint8_t state = kernel_state_get(dest_id);
 	uint8_t conhdl = KERNEL_IDX_GET(src_id);
 	uint8_t conidx = app_ble_find_conn_idx_handle(conhdl);
 
@@ -427,7 +428,7 @@ static int sdp_gattc_event_req_ind_handler(kernel_msg_id_t const msgid,
 									kernel_task_id_t const dest_id,
 									kernel_task_id_t const src_id)
 {
-	uint8_t state = kernel_state_get(dest_id);
+	///uint8_t state = kernel_state_get(dest_id);
 	uint8_t conhdl = KERNEL_IDX_GET(src_id);
 	uint8_t conidx = app_ble_find_conn_idx_handle(conhdl);
 

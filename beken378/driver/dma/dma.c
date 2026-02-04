@@ -61,7 +61,7 @@ uint32_t dma_push(struct dma_desc *first, struct dma_desc *last, uint32_t channe
     while(go_on_flag && ddesc)
     {
         ASSERT(ddesc->length < 2300);
-#if  CFG_GENERAL_DMA
+#if CFG_GENERAL_DMA && (CFG_SOC_NAME != SOC_BK7231N)
         gdma_memcpy((void *)ddesc->dest, (void *)ddesc->src, ddesc->length);
 #else
         os_memcpy((void *)ddesc->dest, (void *)ddesc->src, ddesc->length);

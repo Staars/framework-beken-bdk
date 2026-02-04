@@ -180,6 +180,7 @@ void app_ble_reset(void)
 {
 	app_ble_env.op_mask = 0;
 	app_ble_env.op_cb = NULL;
+	app_ble_env.cmd = BLE_CMD_NONE;
 	app_ble_env.app_status = APP_BLE_READY;
 }
 

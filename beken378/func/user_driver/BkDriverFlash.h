@@ -171,8 +171,10 @@ OSStatus bk_flash_read( bk_partition_t inPartition, volatile uint32_t off_set, u
  * @return    kGeneralErr   : If an error occurred with any step
  */
 OSStatus bk_flash_enable_security(PROTECT_TYPE type );
-
-
+OSStatus bk_flash_get_security(PROTECT_TYPE *protect_flag);
+int bk_flash_abs_addr_write(unsigned int  off_set, const unsigned char *inBuffer , unsigned int  size,unsigned char eraseflag);
+int bk_flash_abs_addr_erase(unsigned int flashOffset, unsigned int size);
+int bk_flash_abs_addr_read(unsigned int off_set, unsigned char *outBuffer, unsigned int size);
 
 #ifdef BOOTLOADER
 /**@brief    Disable security options on a logical partition

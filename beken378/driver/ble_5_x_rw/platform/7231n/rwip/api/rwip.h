@@ -443,7 +443,7 @@ extern const struct rwip_eif_api* rwip_eif_get(uint8_t idx);
 void rwip_assert(const char * file, int line, int param0, int param1, uint8_t type);
 #endif //RW_DEBUG
 
-
+extern unsigned int get_em_map_end(void);
 /* **************************************************************************************
  * Driver functions
  * **************************************************************************************

@@ -49,6 +49,8 @@ extern void rwm_tx_confirm(void *);
 extern void rwm_tx_msdu_renew(UINT8 *buf, UINT32 len, UINT8 *orig_addr);
 extern UINT8 *rwm_get_msdu_content_ptr(MSDU_NODE_T *node);
 extern void rwm_txdesc_copy(struct txdesc *dst_local, ETH_HDR_PTR eth_hdr_ptr);
+extern void *rwm_raw_frame_prepare_space(uint8_t *buffer, int length);
+extern int rwm_raw_frame_destroy_space(void *node);
 extern int rwm_raw_frame_with_cb(uint8_t *buffer, int len, void *cb, void *param);
 extern MSDU_NODE_T *rwm_tx_node_alloc(UINT32 len);
 extern void rwm_node_free(MSDU_NODE_T *node);

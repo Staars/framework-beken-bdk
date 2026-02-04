@@ -39,9 +39,9 @@ static void scan_cb(void *ctxt, uint8_t param)
 	ScanResult apList;
 	int i;
 	GLOBAL_INT_DECLARATION();
-	
+
 	apList.ApList = NULL;
-	
+
 	GLOBAL_INT_DISABLE();
 	scan_rst = sr_get_scan_results();
 	if (scan_rst == NULL) {
@@ -64,7 +64,7 @@ static void scan_cb(void *ctxt, uint8_t param)
 		}
 	}
 	GLOBAL_INT_RESTORE();
-	
+
 	if (apList.ApList == NULL)
 		apList.ApNum = 0;
 
@@ -103,6 +103,8 @@ static void scan_cb(void *ctxt, uint8_t param)
 		"WPA2_MIXED",		////BK_SECURITY_TYPE_WPA3_SAE
 		"WPA3_SAE",	  		/**< WPA3 SAE */
 		"WPA3_WPA2_MIXED",	/** WPA3 SAE or WPA2 AES */
+		"EAP",
+		"OWE",
 		"AUTO",
 	};
 
@@ -314,6 +316,9 @@ void demo_state_app_init(void)
 		case BK_SECURITY_TYPE_WPA3_WPA2_MIXED:
 			bk_printf("WPA2/WPA3 MIXED\n");
 			break;
+		case BK_SECURITY_TYPE_EAP:
+			bk_printf("EAP\n");
+			break;
 		default:
 			bk_printf("Error\r\n");
 			break;
@@ -375,7 +380,7 @@ void demo_ip_app_init(void)
 void bk_demo_monitor_cb(uint8_t *data, int len, wifi_link_info_t *info)
 {
 	os_printf("len:%d\r\n", len);
-		
+
 	//Only for reference
 	/*
 	User can get ssid and key by prase monitor data,
@@ -385,15 +390,15 @@ void bk_demo_monitor_cb(uint8_t *data, int len, wifi_link_info_t *info)
 #if 0
 	int airkiss_recv_ret;
 	airkiss_recv_ret = airkiss_recv(ak_contex, data, len);
-#endif	
-	
+#endif
+
 }
 
 int wifi_demo(int argc, char **argv)
 {
 	char *oob_ssid = NULL;
 	char *connect_key;
-	
+
     if (strcmp(argv[1], "sta") == 0)
     {
 		os_printf("sta_Command\r\n");
@@ -412,7 +417,7 @@ int wifi_demo(int argc, char **argv)
 			os_printf("parameter invalid\r\n");
 			return -1;
 		}
-		
+
 		if(oob_ssid)
 		{
 			demo_sta_app_init(oob_ssid, connect_key);
@@ -449,7 +454,7 @@ int wifi_demo(int argc, char **argv)
 
 	if(strcmp(argv[1], "softap") == 0)
 	{
-		
+
 		os_printf("SOFTAP_COMMAND\r\n\r\n");
 		if (argc == 3)
 		{
@@ -466,7 +471,7 @@ int wifi_demo(int argc, char **argv)
 	        os_printf("parameter invalid\r\n");
 	        return -1;
 		}
-		
+
 		if(oob_ssid)
 		{
 			demo_softap_app_init(oob_ssid, connect_key);

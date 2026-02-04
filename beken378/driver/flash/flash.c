@@ -31,6 +31,7 @@ static const flash_config_t flash_config[] =
 };
 
 static const flash_config_t *flash_current_config = NULL;
+static FUNC_2PARAM_CB flash_wr_sr_bypass_method_cd = NULL;
 static UINT32 flash_id;
 static DD_OPERATIONS flash_op =
 {
@@ -61,6 +62,26 @@ static void flash_get_current_flash_config(void)
     }
 }
 
+void flash_disable_crc(void)
+{
+    UINT32 value;
+
+    value = REG_READ(REG_FLASH_CONF);
+    value &= ~(CRC_EN);
+	
+    REG_WRITE(REG_FLASH_CONF, value);
+}
+
+void flash_enable_crc(void)
+{
+    UINT32 value;
+
+    value = REG_READ(REG_FLASH_CONF);
+    value |= CRC_EN;
+	
+    REG_WRITE(REG_FLASH_CONF, value);
+}
+
 void flash_set_clk(UINT8 clk_conf)
 {
     UINT32 value;
@@ -68,10 +89,6 @@ void flash_set_clk(UINT8 clk_conf)
     value = REG_READ(REG_FLASH_CONF);
     value &= ~(FLASH_CLK_CONF_MASK << FLASH_CLK_CONF_POSI);
     value |= (clk_conf << FLASH_CLK_CONF_POSI);
-
-	#if CFG_JTAG_ENABLE
-    value &= ~(CRC_EN);
-	#endif
 	
     REG_WRITE(REG_FLASH_CONF, value);
 }
@@ -86,7 +103,7 @@ static void flash_enable_cpu_data_wr(void)
     REG_WRITE(REG_FLASH_CONF, value);
 }
 
-static void flash_disable_cpu_data_wr(void)
+void flash_disable_cpu_data_wr(void)
 {
     UINT32 value;
 
@@ -119,7 +136,7 @@ static UINT16 flash_read_sr(UINT8 sr_width)
 {
 	UINT16 sr;
     UINT32 value;
-	
+
     while(REG_READ(REG_FLASH_OPERATE_SW) & BUSY_SW);
 
     value = (FLASH_OPCODE_RDSR << OP_TYPE_SW_POSI) | OP_SW | WP_VALUE;
@@ -128,7 +145,7 @@ static UINT16 flash_read_sr(UINT8 sr_width)
 
     value = REG_READ(REG_FLASH_SR_DATA_CRC_CNT);
     sr = value & 0x00FF;
-	
+
 	if(sr_width == 2)
 	{
 	    value = (FLASH_OPCODE_RDSR2 << OP_TYPE_SW_POSI) | OP_SW | WP_VALUE;
@@ -138,15 +155,20 @@ static UINT16 flash_read_sr(UINT8 sr_width)
 	    value = REG_READ(REG_FLASH_SR_DATA_CRC_CNT);
 	    sr |= (value & 0x00FF) << 8;
 	}
-	
-	//os_printf("--read sr:%x--\r\n",sr);
-	
+
     return sr;
 }
 
 static void flash_write_sr(UINT8 sr_width,  UINT16 val)
 {
     UINT32 value;
+
+	if(flash_wr_sr_bypass_method_cd)
+	{
+		flash_wr_sr_bypass_method_cd((uint32_t)sr_width, (uint32_t)val);
+		return;
+	}
+
 #if (CFG_SOC_NAME == SOC_BK7231N)
     GLOBAL_INT_DECLARATION();
 
@@ -335,6 +357,36 @@ static UINT32 flash_get_id(void)
     while (REG_READ(REG_FLASH_OPERATE_SW) & BUSY_SW);
     flash_id = REG_READ(REG_FLASH_RDID_DATA_FLASH);
     return flash_id;
+}
+
+static UINT32 flash_get_size(void)
+{
+	if (NULL == flash_current_config)
+	{
+		return 0x200000;
+	}
+
+	return flash_current_config->flash_size;
+}
+
+UINT32 flash_is_xtx_type(void)
+{
+	return ((0x0B4014 == flash_id) || (0x0B4015 == flash_id)
+			|| (0x0B4016 == flash_id)
+			|| (0x0B4017 == flash_id)
+			|| (0x0E4016 == flash_id));
+}
+
+UINT32 flash_is_support_0x50h_cmd(void)
+{
+	return flash_is_xtx_type();
+}
+
+UINT32 flash_register_bypass_cb(FUNC_2PARAM_CB cb)
+{
+	flash_wr_sr_bypass_method_cd = cb;
+
+	return 0;
 }
 
 static UINT32 flash_read_mid(void)
@@ -624,7 +676,8 @@ void flash_init(void)
 	#endif
 	
     flash_set_line_mode(flash_current_config->line_mode);
-      
+    flash_enable_crc();
+	
     flash_set_clk(5);  // 60M
 
     ddev_register_dev(FLASH_DEV_NAME, &flash_op);
@@ -755,6 +808,10 @@ UINT32 flash_ctrl(UINT32 cmd, void *parm)
 
     case CMD_FLASH_GET_ID:
         (*(UINT32 *)parm) = flash_get_id();
+        break;
+
+    case CMD_FLASH_GET_SIZE:
+        (*(UINT32 *)parm) = flash_get_size();
         break;
 
     case CMD_FLASH_READ_MID:

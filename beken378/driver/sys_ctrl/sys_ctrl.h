@@ -1,16 +1,15 @@
 #ifndef _SCTRL_H_
 #define _SCTRL_H_
 
-//#define SCTRL_DEBUG
+#define SCTRL_DEBUG    0
 
-#ifdef SCTRL_DEBUG
+#if SCTRL_DEBUG
 #define SCTRL_PRT      os_printf
 #else
 #define SCTRL_PRT      os_null_printf
 #endif
 
 #define DPLL_DELAY_EN                         1
-
 #define DPLL_DELAY_TIME_10US	              120
 #define DPLL_DELAY_TIME_200US	              3400
 

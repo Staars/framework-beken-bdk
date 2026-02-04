@@ -25,13 +25,15 @@
 #include "uart1_tcp_server_demo.h"
 #endif
 
+#if (CFG_SOC_NAME == SOC_BK7231N)
+int uart_print_port = UART1_PORT;
+#else
 int uart_print_port = UART2_PORT;
+#endif
 static struct uart_callback_des uart_receive_callback[2] = {{NULL}, {NULL}};
 static struct uart_callback_des uart_txfifo_needwr_callback[2] = {{NULL}, {NULL}};
 static struct uart_callback_des uart_tx_end_callback[2] = {{NULL}, {NULL}};
 
-#ifndef KEIL_SIMULATOR
-#if CFG_UART_DEBUG_COMMAND_LINE
 UART_S uart[2] =
 {
     {0, 0, 0},
@@ -55,7 +57,6 @@ static DD_OPERATIONS uart2_op =
     uart2_write,
     uart2_ctrl
 };
-#endif
 
 UINT8 uart_is_tx_fifo_empty(UINT8 uport)
 {
@@ -147,33 +148,6 @@ void print_hex_dump(const char *prefix, void *buf, int len)
 		os_printf("%02X ", b[i]);
 	os_printf("\n");
 }
-
-#if CFG_BACKGROUND_PRINT
-INT32 uart_printf(const char *fmt, ...)
-{
-    INT32 rc;
-    char buf[TX_RB_LENGTH];
-
-    va_list args;
-    va_start(args, fmt);
-    rc = vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-
-    buf[sizeof(buf) - 1] = '\0';
-    if((rc < sizeof(buf) - 2)
-            && (buf[rc - 1] == '\n')
-            && (buf[rc - 2] != '\r'))
-    {
-        buf[rc - 1] = '\r';
-        buf[rc] = '\n';
-        buf[rc + 1] = 0;
-
-        rc += 1;
-    }
-
-    return kfifo_put(uart[1].tx, (UINT8 *)&buf[0], rc);
-}
-#endif // CFG_BACKGROUND_PRINT
 
 void fatal_print(const char *fmt, ...)
 {
@@ -307,8 +281,6 @@ void uart_hw_set_change(UINT8 uport, bk_uart_config_t *uart_config)
     REG_WRITE(intr_ena_reg_addr, reg);
 }
 
-
-#if CFG_UART_DEBUG_COMMAND_LINE
 UINT32 uart_sw_init(UINT8 uport)
 {
     uart[uport].rx = kfifo_alloc(RX_RB_LENGTH);
@@ -532,6 +504,23 @@ void uart_set_tx_stop_end_int(UINT8 uport, UINT8 set)
 		REG_WRITE(REG_UART1_INTR_ENABLE, reg);
 	else
 		REG_WRITE(REG_UART2_INTR_ENABLE, reg);
+}
+
+void uart_fast_init(void)
+{
+    UINT32 param;
+
+    if (UART1_PORT == uart_print_port)
+    {
+        param = PWD_UART1_CLK_BIT;
+    }
+    else
+    {
+        param = PWD_UART2_CLK_BIT;
+    }
+
+    icu_ctrl(CMD_CLK_PWR_UP, &param);
+    uart_hw_init(uart_print_port);
 }
 
 /*******************************************************************/
@@ -790,10 +779,8 @@ UINT32 uart1_ctrl(UINT32 cmd, void *parm)
     return ret;
 }
 
-
 void uart2_isr(void)
 {
-#if CFG_UART_DEBUG_COMMAND_LINE
     UINT32 status;
     UINT32 intr_en;
     UINT32 intr_status;
@@ -857,9 +844,8 @@ void uart2_isr(void)
 	if(status & UART_RXD_WAKEUP_STA)
     {
     }
-
-#endif
 }
+
 void uart2_init(void)
 {
     UINT32 ret;
@@ -1067,9 +1053,6 @@ UINT32 uart_wait_tx_over()
 
     return uart_wait_us;
 }
-#endif // (!CFG_UART_DEBUG_COMMAND_LINE)
-
-#endif // KEIL_SIMULATOR
 
 INT32 os_null_printf(const char *fmt, ...)
 {

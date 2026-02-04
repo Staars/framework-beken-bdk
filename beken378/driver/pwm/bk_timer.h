@@ -24,7 +24,7 @@
 #define TIMERCTLA_INT_POSI                             (7)
 #define REG_TIMERCTLA_PERIOD_ADDR(n)                    (PWM_NEW_BASE +  0x04 * (n))
 
-#if (CFG_SOC_NAME != SOC_BK7231)
+#if (CFG_SOC_NAME != SOC_BK7221U)
 #define TIMER0_2_READ_CTL                             (PWM_NEW_BASE + 4 * 4)
 #define TIMER0_2_READ_OP_BIT                          (1<<0)
 #define TIMER0_2_READ_INDEX_POSI                       (2)
@@ -37,9 +37,7 @@
 #endif
 
 #define TIMER3_CNT                                     (PWM_NEW_BASE + 0x10 * 4)
-
 #define TIMER4_CNT                                     (PWM_NEW_BASE + 0x11 * 4)
-
 #define TIMER5_CNT                                     (PWM_NEW_BASE + 0x12 * 4)
 
 #define TIMER3_5_CTL                                   (PWM_NEW_BASE + 0x13 * 4)
@@ -51,10 +49,12 @@
 #define TIMERCTL3_INT_BIT                              (0x01UL << 7)
 #define TIMERCTL4_INT_BIT                              (0x01UL << 8)
 #define TIMERCTL5_INT_BIT                              (0x01UL << 9)
-#define TIMERCTLB_INT_POSI                              (7)
-#define REG_TIMERCTLB_PERIOD_ADDR(n)                    (PWM_NEW_BASE + 0x10 * 4 + 0x04 * (n - 3))
+#define TIMERCTLB_INT_POSI                             (7)
+#define REG_TIMERCTLB_PERIOD_ADDR(n)                   (PWM_NEW_BASE + 0x10 * 4 + 0x04 * (n - 3))
 
-#if (CFG_SOC_NAME != SOC_BK7231)
+#define REG_TIMERCTL_PERIOD_ADDR(group, id)            (PWM_NEW_BASE + 0x10 * group * 4 + 0x04 * (id - group * 3))
+
+#if (CFG_SOC_NAME != SOC_BK7221U)
 #define TIMER3_5_READ_CTL                             (PWM_NEW_BASE + 0x14 * 4)
 #define TIMER3_5_READ_OP_BIT                          (1<<0)
 #define TIMER3_5_READ_INDEX_POSI                       (2)

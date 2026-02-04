@@ -43,6 +43,7 @@
 #include "co_list.h"
 #include "co_ring.h"
 #include "dma.h"
+#include "vif_mgmt.h"
 
 //#define RXL_CNTRL_DEBUG
 
@@ -238,6 +239,9 @@ int8_t rxl_get_beacon_rssi(void);
 void rxl_mpdu_transfer_mesh(struct rx_swdesc *swdesc);
 #endif
 
+#if (NX_P2P)
+void rxl_packet_trace(uint8_t *frame, struct vif_info_tag *vif);
+#endif
 #endif // _RXL_CNTRL_H_
 // eof
 

@@ -424,6 +424,8 @@ typedef struct wiphy
 
 extern WIPHY_T g_wiphy;
 
+void rwnx_hw_reinit(void);
+
 #endif // _RW_IEEE80211_H_
 // eof
 

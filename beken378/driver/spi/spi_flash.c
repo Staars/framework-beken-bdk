@@ -91,8 +91,6 @@ static UINT16 spi_flash_read_status(void)
     bk_spi_master_xfer(&msg);
     ustatus |= (ustatus_buf[0]) << 8;
 
-    //BK_SPI_PRT("uid:%04x\r\n", ustatus);
-
     return ustatus;
 }
 

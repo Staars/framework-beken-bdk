@@ -64,7 +64,8 @@
 
 #include "ea.h"
 
-
+#include "ble_pub.h"
+#include "cmd_evm.h"
 
 #define Uart_Write_Byte(v)               (REG_APB3_UART_PORT=v)
 
@@ -102,7 +103,8 @@ unsigned char uart_tx_buf[UART0_TX_FIFO_MAX_COUNT];
 volatile bool uart_rx_done = 0;
 volatile unsigned long uart_rx_index = 0;
 uint8_t cur_read_buf_idx = 0;
-
+uint8_t ble_test_mode = IDLE_MODE;
+uint8_t tx_mode;
 
 #define UART_READ_BYTE()                 (REG_APB3_UART_PORT&0xff)
 
@@ -220,135 +222,41 @@ char uart_buff[128];
  */	
 uint16_t Read_Uart_Buf(uint8_t *buf, uint16_t len)
 {
-
-    memcpy(buf, &(uart_rx_buf[cur_read_buf_idx]), len);
-    cur_read_buf_idx+= len;
-    return len;
+	memcpy(buf, &(uart_rx_buf[cur_read_buf_idx]), len);
+	cur_read_buf_idx += len;
+	return len;
 }
 
 uint8_t Uart_Read_Byte(void)
 {
-	return (REG_APB3_UART_PORT&0xff);
-}	
-
+	return (REG_APB3_UART_PORT & 0xff);
+}
 
 int uart_putchar(char * st)
 {
-	  uint8_t num = 0;
+	uint8_t num = 0;
 #if UART_PRINTF_EN
-    while (*st) 
-    {
+	while (*st)
+	{
 		if(UART_TX_WRITE_READY)
 		{
 			REG_APB3_UART_PORT = *st;
-	    	st++;
+			st++;
 			num++;
-	    }
+		}
 	} 
 #endif 		
-    return num;
+	return num;
 }
-
-char *hex2Str( uint8_t data)
-{
-
-  char hex[] = "0123456789ABCDEF";
-  static char str[3];
-  char *pStr = str;
- 
-  *pStr++ = hex[data >> 4];
-  *pStr++ = hex[data & 0x0F];
-  *pStr = 0;
-
-  return str;
-}
-
-void uart_print_int(unsigned int num)
-{
-	uint8_t i;
-	uint8_t m;
-
-	uart_putchar((char *)"0x");
-	for (i = 4;i > 0;i--)
-	{
-		m = ((num >> (8 * (i - 1)))& 0xff);
-		uart_putchar(hex2Str(m));
-	}
-	uart_putchar("\r\n");
-}
-
-
-
-void cpu_delay( volatile unsigned int times)
-{
-    while(times--)
-	{
-		for(uint32_t i = 0;i < 1000;i++)
-			;
-	}				
-}
-
-
-void uart_init(uint32_t baudrate)
-{
-#if	UART_PRINTF_EN
-    unsigned int baud_divisor ;
-    REG_AHB0_ICU_UARTCLKCON   &= ~(0x1 << 0) ;  // Enable Uart's Clocks 
-    switch(baudrate)
-    {
-    	case 9600:
-		case 19200:
-		case 38400:
-		case 57600:
-		case 115200:
-			baud_divisor = 0x89;
-			break;
-		case 921600:
-			baud_divisor = 0x10;
-			break;
-		default:
-			baud_divisor = 0x89;
-			break;
-	}
-    REG_APB3_UART_CFG  = (baud_divisor<<8) + 
-                          (stop_bits   <<7) + 
-                          //(parity_mode <<6) + 
-                          //(parity_en <<5) + 
-                          (data_len    <<3) + 
-                          (irda_mode   <<2) + 
-                          (uart_rx_en  <<1) + 
-                           uart_tx_en ;
-  
-    REG_APB3_UART_FIFO_CFG = (1<<BIT_TX_FIFO_THRESHOLD)|(16<<BIT_RX_FIFO_THRESHOLD)|(0x0 << BIT_STOP_DETECT_TIME);
-    REG_APB3_UART_INT_ENABLE = ((0x01 << 1) | (0x01 << 6) | (0x01 << 7)); 
-    REG_APB3_UART_FLOW_CFG  = 0x00000000 ;  // No Flow Control   
-    REG_APB3_UART_WAKERNEL_CFG  = ((0x01 << 0 )| (0x01 << 20) |  (0x01 << 21)| (0x01 << 22));  // No Wake Control
-    	
-    REG_APB5_GPIOA_CFG  &= ~((0x3<<BIT_GPIO_PULL_UP)  + (0x3<<BIT_GPIO_PERI_EN)); 
-    REG_APB5_GPIOA_CFG  |= ((0x3<<BIT_GPIO_PULL_UP)); 
-    REG_APB5_GPIOA_CFG  |=   (0x3<<BIT_GPIO_OUT_EN_N);
-		
-    REG_APB5_GPIOA_DATA &= ~ (0x3<<BIT_GPIO_INPUT_EN);
-		
-
-    uart_env.rx.callback = NULL;
-    uart_env.rx.dummy    = NULL;
-
-	
-#endif
-}	
-
-
 
 void ble_uart_flow_on(void)
 {
-    // Configure modem (HW flow control enable)
-    // uart_flow_en_setf(0);
+	// Configure modem (HW flow control enable)
+	// uart_flow_en_setf(0);
 }
 
 void uart_clear_rxfifo()
 {
-	
 	while(uart_rx_fifo_rd_ready_getf())
 	{
 		Uart_Read_Byte();
@@ -358,29 +266,27 @@ void uart_clear_rxfifo()
 }
 bool ble_uart_flow_off(void)
 {
-	
-	  return true;
-	
+	return true;
 }
 
 void uart_finish_transfers(void)
 {
-    uart_flow_en_setf(1);
+	uart_flow_en_setf(1);
 
-    // Wait TX FIFO empty
-    while(!uart_tx_fifo_empty_getf());
+	// Wait TX FIFO empty
+	while(!uart_tx_fifo_empty_getf());
 }
 
 
 void ble_uart_read(uint8_t *bufptr, uint32_t size, uint8_t (*callback) (void*, uint8_t), void* dummy)
 {
-    // Sanity check
-    BLE_ASSERT_ERR(bufptr != NULL);
-    BLE_ASSERT_ERR(size != 0);
-    BLE_ASSERT_ERR(callback != NULL);
-    uart_env.rx.callback = callback;
+	// Sanity check
+	BLE_ASSERT_ERR(bufptr != NULL);
+	BLE_ASSERT_ERR(size != 0);
+	BLE_ASSERT_ERR(callback != NULL);
+	uart_env.rx.callback = callback;
 
-    uart_env.rx.dummy    = dummy;
+	uart_env.rx.dummy    = dummy;
 }
 
 
@@ -428,22 +334,105 @@ static void uart_send_byte(unsigned char data)
 
 void uart_send(unsigned char *buff, int len)
 {
-    while (len--)
-        uart_send_byte(*buff++);
+	while (len--)
+		uart_send_byte(*buff++);
 }
 
+void uart_rx_cmd_handler(uint8_t *buff, uint8_t len)
+{
+	uint8_t length;
+	length = len;
+	switch (buff[0]) {
+		case EXIT_DUT_CMD:
+			if ((length == 2) && (buff[1] == EXIT_DUT_ACT)) {
+				ble_send_msg(BLE_MSG_EXIT);
+			} else {
+				bk_printf("unknow dut cmd\r\n");
+			}
+		break;
+		case TX_PWR_SET_CMD:
+			if (length == 2) {
+				uint8_t pwr_idx = buff[1];
+				if (pwr_idx > 31)
+					pwr_idx = 31;
+				extern void rwnx_cal_set_txpwr(UINT32 pwr_gain, UINT32 grate);
+				rwnx_cal_set_txpwr(pwr_idx, EVM_DEFUALT_BLE_RATE);
+				bk_printf("idx:%d\r\n", pwr_idx);
 
+				if (ble_test_mode == USER_TX_MODE)
+				{
+					ble_ctrl(CMD_BLE_STOP_TX, NULL);
+					ble_ctrl(CMD_BLE_START_TX, &tx_mode);
+				}
+			} else {
+				bk_printf("unknow dut cmd\r\n");
+			}
+		break;
+		case TX_PWR_SAVE_CMD:
+			if (length == 3) {
+				uint8_t channel = buff[1];
+				uint8_t pwr_idx = buff[2];
+
+				if (channel > 39)
+					channel = 39;
+				if (pwr_idx > 31)
+					pwr_idx = 31;
+				extern void manual_cal_save_txpwr(UINT32 rate, UINT32 channel, UINT32 pwr_gain);
+				manual_cal_save_txpwr(EVM_DEFUALT_BLE_RATE, channel, pwr_idx);
+
+			} else {
+				bk_printf("unknow dut cmd\r\n");
+			}
+		break;
+		case USER_SEND_CMD:
+			if (length == 3) {
+				uint8_t channel = buff[1];
+				tx_mode = buff[2];
+				if (channel > 39)
+					channel = 39;
+
+				void rwnx_cal_set_txpwr_by_channel(UINT32 channel);
+				rwnx_cal_set_txpwr_by_channel(channel);
+
+				uint32_t freq = (uint32_t)((channel + 1) * 2);
+
+				ble_ctrl(CMD_BLE_SET_CHANNEL, &freq);
+				ble_ctrl(CMD_BLE_START_TX, &tx_mode);
+
+				ble_test_mode = USER_TX_MODE;
+			} else {
+				bk_printf("unknow dut cmd\r\n");
+			}
+		break;
+		case USER_STOP_CMD:
+			if (length == 2) {
+				if (buff[1] == USER_SEND_CMD) {
+					ble_ctrl(CMD_BLE_STOP_TX, NULL);
+					ble_test_mode = IDLE_MODE;
+				} else {
+					bk_printf("unknow dut cmd");
+				}
+			} else {
+				bk_printf("unknow dut cmd");
+			}
+		break;
+		default:
+		break;
+	}
+}
+
+extern int bkreg_run_command(const char *content, int cnt);
 
 void uart_isr(void)
 {		
-   uint32_t IntStat;
-	
- #if BLE_TESTER
+	uint32_t IntStat;
+
+#if BLE_TESTER
 	uint8_t (*callback) (void*, uint8_t) = NULL;
-    void* data =NULL;
+	void* data =NULL;
 #endif
-	
-    IntStat = uart_isr_stat_get();	 
+
+	IntStat = uart_isr_stat_get();
 	if(uart_rx_fifo_need_rd_isr_getf() || uart_rx_end_isr_getf()|| uart_rxd_wakeup_isr_getf())
 	{
 		while((REG_APB3_UART_FIFO_STAT & (0x01 << 21)))
@@ -455,10 +444,17 @@ void uart_isr(void)
 			}
 		}
 
-		uart_rx_done = 1 ;		
+		if ((uart_rx_buf[0] == 0x01) && (uart_rx_buf[1] == 0xe0) && (uart_rx_buf[2] == 0xfc)) {
+			if (uart_rx_buf[3] == (uart_rx_index - 4)) {
+				uart_rx_cmd_handler((uint8_t *)&uart_rx_buf[4], uart_rx_buf[3]);
+				bkreg_run_command((char*)&uart_rx_buf[0], uart_rx_index);
+			}
+		}
+
+		uart_rx_done = 1;
 		uart_rx_index = 0;
 	}
-	#if BLE_TESTER
+#if BLE_TESTER
 	{
 		callback = uart_env.rx.callback;
 		data = uart_env.rx.dummy;
@@ -473,9 +469,9 @@ void uart_isr(void)
 	  	 	callback(data, RWIP_EIF_STATUS_OK);
 		}
 	}
-	#endif // BLE_TESTER
+#endif // BLE_TESTER
 
-     uart_isr_stat_set(IntStat);
+	uart_isr_stat_set(IntStat);
 }
 
 uint8_t check_uart_stop(void)

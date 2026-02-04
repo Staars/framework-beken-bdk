@@ -203,7 +203,7 @@ void enter_dut_fcc_mode(void)
 	static uint32_t default_mclk_div = BLE_DUT_DIVISION;
 
 #ifdef FOR_TEST
-	bk7011_reduce_vdddig_for_rx(1);
+	//bk7011_reduce_vdddig_for_rx(1);
 	ble_dut_status = DUT_RUNNING;
 	sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_MUX_GET, &default_mclk_mux);
 	sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_DIV_GET, &default_mclk_div);
@@ -214,11 +214,11 @@ void enter_dut_fcc_mode(void)
 	sddev_control(SCTRL_DEV_NAME, CMD_BLE_RF_BIT_SET, NULL);
 	extern void ble_cal_set_txpwr(uint8_t idx);
 	ble_cal_set_txpwr(tx_pwr_idx);
-#if (BLE_DUT_UART_PORT == PORT_UART2)
-	intc_service_change_handler(IRQ_UART2, ble_uart_isr);
-#else
-	intc_service_change_handler(IRQ_UART1, ble_uart_isr);
-#endif
+	if (uart_print_port == UART2_PORT) {
+		intc_service_change_handler(IRQ_UART2, ble_uart_isr);
+	} else {
+		intc_service_change_handler(IRQ_UART1, ble_uart_isr);
+	}
 #endif
 	while (1) {
 		OSStatus err;
@@ -238,7 +238,7 @@ void enter_dut_fcc_mode(void)
 					break;
 				case BLE_DUT_EXIT:
 					bk_printf("exit ble dut\r\n");
-					bk7011_reduce_vdddig_for_rx(0);
+					//bk7011_reduce_vdddig_for_rx(0);
 					ble_dut_status = DUT_IDLE;
 					sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_SELECT, &default_mclk_mux);
 					sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_DIVISION, &default_mclk_div);
@@ -246,15 +246,15 @@ void enter_dut_fcc_mode(void)
 					sddev_control(SCTRL_DEV_NAME, CMD_BLE_RF_BIT_CLR, NULL);
 					extern void ble_cal_recover_txpwr(void);
 					ble_cal_recover_txpwr();
-#if (BLE_DUT_UART_PORT == PORT_UART2)
-					intc_service_change_handler(IRQ_UART2, uart2_isr);
-#else
-					intc_service_change_handler(IRQ_UART1, uart1_isr);
-#endif
+					if (uart_print_port == UART2_PORT) {
+						intc_service_change_handler(IRQ_UART2, uart2_isr);
+					} else {
+						intc_service_change_handler(IRQ_UART1, uart1_isr);
+					}
 					break;
 				case BLE_DUT_START:
 					bk_printf("enter ble dut\r\n");
-					bk7011_reduce_vdddig_for_rx(1);
+					//bk7011_reduce_vdddig_for_rx(1);
 					ble_dut_status = DUT_RUNNING;
 					sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_MUX_GET, &default_mclk_mux);
 					sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_DIV_GET, &default_mclk_div);
@@ -266,22 +266,53 @@ void enter_dut_fcc_mode(void)
 					sddev_control(SCTRL_DEV_NAME, CMD_BLE_RF_BIT_SET, NULL);
 					extern void ble_cal_set_txpwr(uint8_t idx);
 					ble_cal_set_txpwr(tx_pwr_idx);
-#if (BLE_DUT_UART_PORT == PORT_UART2)
-					intc_service_change_handler(IRQ_UART2, ble_uart_isr);
-#else
-					intc_service_change_handler(IRQ_UART1, ble_uart_isr);
-#endif
+					if (uart_print_port == UART2_PORT) {
+						intc_service_change_handler(IRQ_UART2, ble_uart_isr);
+					} else {
+						intc_service_change_handler(IRQ_UART1, ble_uart_isr);
+					}
+					break;
+				case BLE_THREAD_EXIT:
+					bk_printf("ble thread exit\r\n");
+					goto exit_dut_loop;
 					break;
 				default:
 					break;
 			}
 		}
 	}
+
+exit_dut_loop:
+{
+	GLOBAL_INT_DECLARATION();
+	
+	bk_printf("exit ble loop\r\n");
+
+	GLOBAL_INT_DISABLE();
+	bk7011_reduce_vdddig_for_rx(0);
+	ble_dut_status = DUT_IDLE;
+	sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_SELECT, &default_mclk_mux);
+	sddev_control(SCTRL_DEV_NAME, CMD_SCTRL_MCLK_DIVISION, &default_mclk_div);
+
+	sddev_control(SCTRL_DEV_NAME, CMD_BLE_RF_BIT_CLR, NULL);
+	extern void ble_cal_recover_txpwr(void);
+	ble_cal_recover_txpwr();
+#if (BLE_DUT_UART_PORT == PORT_UART2)
+	intc_service_change_handler(IRQ_UART2, uart2_isr);
+#else
+	intc_service_change_handler(IRQ_UART1, uart1_isr);
+#endif
+	ble_set_power_up(0);
+	ble_clk_power_up(0);
+
+	GLOBAL_INT_RESTORE();
+}
 }
 
 void enter_normal_app_mode(void)
 {
 	bk_printf("enter normal mode\r\n");
+	bk_printf("EM_BLE_END:0x%x\r\n",get_em_map_end());
 
 	while (1) {
 		OSStatus err;
@@ -296,6 +327,10 @@ void enter_normal_app_mode(void)
 					//ble_diagcntl_set(0x00008383);
 					rwip_schedule();
 					break;
+				case BLE_THREAD_EXIT:
+					bk_printf("ble thread exit\r\n");
+					goto exit_normal_loop;
+					break;
 				default:
 					break;
 			}
@@ -308,6 +343,18 @@ void enter_normal_app_mode(void)
 			GLOBAL_INT_RES();
 		}
 	}
+exit_normal_loop:
+{
+	extern void ble_switch_rf_to_wifi(void);
+	GLOBAL_INT_DECLARATION();
+	GLOBAL_INT_DISABLE();
+
+	ble_set_power_up(0);
+	ble_clk_power_up(0);
+	GLOBAL_INT_RESTORE();
+	ble_switch_rf_to_wifi();
+}
+	return;
 }
 
 void ble_thread_main(void *arg)
@@ -408,6 +455,34 @@ void ble_entry(void)
         ASSERT(0 == ret);
     }
 }
+
+void ble_thread_exit(void)
+{
+    if (ble_thread_handle || ble_msg_que) {
+
+        if(ble_thread_handle)
+        {
+            bk_printf("send msg to ble thread exit\r\n");
+            ble_send_msg(BLE_THREAD_EXIT);
+            while(ble_thread_handle)
+            {
+                rtos_delay_milliseconds(4);
+            }
+        }
+        
+        if(ble_msg_que)
+        {
+            rtos_deinit_queue(&ble_msg_que);
+            ble_msg_que = NULL;
+        }
+    }
+}
+
+UINT32 ble_thread_is_up(void)
+{
+	return (ble_thread_handle) ? 1 : 0;
+}
+
 
 UINT32 ble_ctrl( UINT32 cmd, void *param )
 {

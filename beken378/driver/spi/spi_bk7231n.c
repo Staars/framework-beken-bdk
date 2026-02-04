@@ -13,7 +13,7 @@
 #include "spi_bk7231n.h"
 
 #define SPI_PERI_CLK_26M		(26 * 1000 * 1000)
-#define SPI_PERI_CLK_DCO		(80 * 1000 * 1000)
+#define SPI_PERI_CLK_DCO		(120 * 1000 * 1000)
 
 static SDD_OPERATIONS spi_op = {
 	spi_ctrl
@@ -119,6 +119,8 @@ static void spi_set_clock(UINT32 max_hz)
 			BK_SPI_PRT("input clk > 30MHz, set input clk = 30MHz\n");
 		} else
 			spi_clk = max_hz;
+
+		param = PCLK_POSI_SPI;
 		sddev_control(ICU_DEV_NAME, CMD_CLK_PWR_DOWN, &param);
 		source_clk = SPI_PERI_CLK_DCO;
 		param = PCLK_POSI_SPI;
@@ -251,7 +253,19 @@ static void spi_slave_set_cs_finish_interrupt(UINT32 enable)
 	REG_WRITE(SPI_STAT, value);
 }
 
-static void spi_gpio_configuration(void)
+void spi_3_line_gpio_configuration(void)
+{
+	uint32_t val;
+
+	bk_printf("spi 3 line gpio cfg\r\n");
+	val = GFUNC_MODE_SPI_GPIO_14;
+	sddev_control(GPIO_DEV_NAME, CMD_GPIO_ENABLE_SECOND, &val);
+
+	val = GFUNC_MODE_SPI_GPIO_16_17;
+	sddev_control(GPIO_DEV_NAME, CMD_GPIO_ENABLE_SECOND, &val);
+ }
+
+void spi_4_line_gpio_configuration(void)
 {
 	uint32_t val;
 
@@ -262,8 +276,6 @@ static void spi_gpio_configuration(void)
 #else
 #error "USE_SPI_GPIO_NUM must set to gpio14-17 or gpio30-33"
 #endif
-
-
 	sddev_control(GPIO_DEV_NAME, CMD_GPIO_ENABLE_SECOND, &val);
 }
 
@@ -356,7 +368,9 @@ void set_txtrans_len(UINT32 val)
 	value = REG_READ(SPI_CONFIG);
 
 	value &= ~(0xFFF << SPI_TX_TRAHS_LEN_POSI);
-	value |= ((val & 0xFFF) << SPI_TX_TRAHS_LEN_POSI);
+
+	if(val < SPI_TX_LENGTH_MAX)
+		value |= ((val & 0xFFF) << SPI_TX_TRAHS_LEN_POSI);
 
 	REG_WRITE(SPI_CONFIG, value);
 }
@@ -368,7 +382,9 @@ void set_rxtrans_len(UINT32 val)
 	value = REG_READ(SPI_CONFIG);
 
 	value &= ~(0xFFF << SPI_RX_TRAHS_LEN_POSI);
-	value |= ((val & 0xFFF) << SPI_RX_TRAHS_LEN_POSI);
+
+	if(val < SPI_TX_LENGTH_MAX)
+		value |= ((val & 0xFFF) << SPI_RX_TRAHS_LEN_POSI);
 
 	REG_WRITE(SPI_CONFIG, value);
 }
@@ -381,10 +397,7 @@ static void spi_init_msten(UINT8 param)
 	value = REG_READ(SPI_CTRL);
 	value &= ~((TXINT_MODE_MASK << TXINT_MODE_POSI) | (RXINT_MODE_MASK << RXINT_MODE_POSI));
 
-	value |= RXOVR_EN
-			 | TXOVR_EN;
-	//| (0x3UL << RXINT_MODE_POSI)   // fifo_level :32
-	//| (0x3UL << TXINT_MODE_POSI);	//  fifo_level :32
+	value |= RXOVR_EN | TXOVR_EN;
 
 	REG_WRITE(SPI_CTRL, value);
 	if (msten == 0)
@@ -393,7 +406,12 @@ static void spi_init_msten(UINT8 param)
 		spi_slave_set_cs_finish_interrupt(0);
 
 	spi_icu_configuration(1);
-	spi_gpio_configuration();
+
+#if ((SPI_LINE_MODE == SPI_USE_3_LINE) && msten)
+	spi_3_line_gpio_configuration();
+#else
+	spi_4_line_gpio_configuration();
+#endif
 }
 
 static void spi_deinit_msten(void)
@@ -454,6 +472,9 @@ static struct spi_callback_des spi_receive_callback = {NULL, NULL};
 static struct spi_callback_des spi_txfifo_needwr_callback = {NULL, NULL};
 static struct spi_callback_des spi_tx_end_callback = {NULL, NULL};
 
+static struct spi_callback_des spi_tx_finish_callback = {NULL, NULL};
+static struct spi_callback_des spi_rx_finish_callback = {NULL, NULL};
+
 static void spi_rx_callback_set(spi_callback callback, void *param)
 {
 	spi_receive_callback.callback = callback;
@@ -470,6 +491,18 @@ static void spi_tx_end_callback_set(spi_callback callback, void *param)
 {
 	spi_tx_end_callback.callback = callback;
 	spi_tx_end_callback.param = param;
+}
+
+static void spi_tx_finish_callback_set(spi_callback callback, void *param)
+{
+	spi_tx_finish_callback.callback = callback;
+	spi_tx_finish_callback.param = param;
+}
+
+static void spi_rx_finish_callback_set(spi_callback callback, void *param)
+{
+	spi_rx_finish_callback.callback = callback;
+	spi_rx_finish_callback.param = param;
 }
 
 void spi_init(void)
@@ -539,21 +572,24 @@ UINT32 spi_ctrl(UINT32 cmd, void *param)
 	case CMD_SPI_GET_BUSY:
 
 		break;
-	case CMD_SPI_SET_RX_CALLBACK: {
-		struct spi_callback_des *callback = (struct spi_callback_des *)param;
-		spi_rx_callback_set(callback->callback, callback->param);
-	}
-	break;
-	case CMD_SPI_SET_TX_NEED_WRITE_CALLBACK: {
-		struct spi_callback_des *callback = (struct spi_callback_des *)param;
-		spi_tx_fifo_needwr_callback_set(callback->callback, callback->param);
-	}
-	break;
-	case CMD_SPI_SET_TX_FINISH_CALLBACK: {
-		struct spi_callback_des *callback = (struct spi_callback_des *)param;
-		spi_tx_end_callback_set(callback->callback, callback->param);
-	}
-	break;
+	case CMD_SPI_SET_RX_CALLBACK:
+		{
+			struct spi_callback_des *callback = (struct spi_callback_des *)param;
+			spi_rx_callback_set(callback->callback, callback->param);
+		}
+		break;
+	case CMD_SPI_SET_TX_NEED_WRITE_CALLBACK:
+		{
+			struct spi_callback_des *callback = (struct spi_callback_des *)param;
+			spi_tx_fifo_needwr_callback_set(callback->callback, callback->param);
+		}
+		break;
+	case CMD_SPI_SET_TX_FINISH_CALLBACK:
+		{
+			struct spi_callback_des *callback = (struct spi_callback_des *)param;
+			spi_tx_end_callback_set(callback->callback, callback->param);
+		}
+		break;
 	case CMD_SPI_DEINIT_MSTEN:
 		spi_deinit_msten();
 		break;
@@ -576,11 +612,24 @@ UINT32 spi_ctrl(UINT32 cmd, void *param)
 		set_txtrans_len(*(UINT32 *)param);
 		break;
 	case CMD_SPI_RXTRANS_EN:
-		set_txtrans_len(*(UINT32 *)param);
+		set_rxtrans_len(*(UINT32 *)param);
 		break;
 	case CMD_SPI_CS_EN:
 		spi_slave_set_cs_finish_interrupt(*(UINT32 *)param);
 		break;
+	case CMD_SPI_SET_TX_FINISH_INT_CALLBACK:
+		{
+			struct spi_callback_des *callback = (struct spi_callback_des *)param;
+			spi_tx_finish_callback_set(callback->callback, callback->param);
+		}
+		break;
+	case CMD_SPI_SET_RX_FINISH_INT_CALLBACK:
+		{
+			struct spi_callback_des *callback = (struct spi_callback_des *)param;
+			spi_rx_finish_callback_set(callback->callback, callback->param);
+		}
+		break;
+
 	default:
 		ret = SPI_FAILURE;
 		break;
@@ -595,15 +644,10 @@ void spi_isr(void)
 {
 	UINT32 status;
 
-	//REG_WRITE((0x00802800+(19*4)), 0x02);
-	//REG_WRITE((0x00802800+(0x1a*4)), 0x02);
-	//REG_WRITE((0x00802800+(0x1a*4)), 0x00);
-
 	status = REG_READ(SPI_STAT);
 	REG_WRITE(SPI_STAT, status);
 
-	os_printf("0x%08x\r\n", status);
-	//REG_WRITE((0x00802800+(19*4)), 0x00);
+	//BK_SPI_PRT("0x%08x\r\n", status);
 
 	if ((status & RXINT) || (status & SPI_S_CS_UP_INT_STATUS)) {
 		REG_WRITE((0x00802800 + (0x18 * 4)), 0x02);
@@ -626,9 +670,7 @@ void spi_isr(void)
 	}
 
 	if (status & TXINT) {
-		//REG_WRITE((0x00802800+(0x1c*4)), 0x02);
-		//REG_WRITE((0x00802800+(0x1c*4)), 0x00);
-		os_printf("spi txint\r\n");
+		BK_SPI_PRT("spi txint\r\n");
 
 		if (spi_txfifo_needwr_callback.callback != 0) {
 			void *param = spi_txfifo_needwr_callback.param;
@@ -640,23 +682,14 @@ void spi_isr(void)
 		}
 	}
 
-	if (status & TXOVR)
-		os_printf("txovr\r\n");
+	if (status & TX_FINISH_INT) {
+		BK_SPI_PRT("tx finish int \r\n");
 
-	if (status & RXOVR)
-		os_printf("rxovr\r\n");
+		if (spi_tx_finish_callback.callback != 0) {
+			void *param = spi_tx_finish_callback.param;
+			spi_tx_finish_callback.callback(0, param);
 
-	if (status & RX_FINISH_INT)
-		os_printf("rx finish int \r\n");
-
-	if (status & TXFIFO_WR_READ) {
-		if (spi_tx_end_callback.callback != 0) {
-			void *param = spi_tx_end_callback.param;
-
-			spi_tx_end_callback.callback(0, param);
-		} else {
-			/*fill txfifo with 0xff*/
-			//spi_txfifo_fill();
+			REG_WRITE(SPI_STAT, status);
 		}
 	}
 }

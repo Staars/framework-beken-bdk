@@ -29,7 +29,6 @@
 
 #define INTC_MAX_COUNT                    32
 
-
 struct arm_registers
 {
     uint32_t r0;

@@ -5987,7 +5987,7 @@ int mbedtls_ssl_setup( mbedtls_ssl_context *ssl,
                        const mbedtls_ssl_config *conf )
 {
     int ret;
-    const size_t len = MBEDTLS_SSL_BUFFER_LEN;
+    const size_t len __maybe_unused = MBEDTLS_SSL_BUFFER_LEN;
 
     ssl->conf = conf;
 

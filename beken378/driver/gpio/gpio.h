@@ -11,6 +11,8 @@
 #define JTAG_GPIO_FILTER
 #endif
 
+typedef void (*GPIO_FUNC_PTR)(unsigned char param);
+
 #define GPIO_INIT_FLAG                   ((UINT32)1)
 #define GPIO_UNINIT_FLAG                 ((UINT32)-1)
 
@@ -51,7 +53,6 @@
 
 #define REG_GPIO_CFG_BASE_ADDR               (REG_GPIO_0_CONFIG)
 
-
 #define GCFG_INPUT_POS                       0
 #define GCFG_OUTPUT_POS                      1
 #define GCFG_INPUT_ENABLE_POS                2
@@ -61,7 +62,6 @@
 #define GCFG_FUNCTION_ENABLE_POS             6
 #define GCFG_INPUT_MONITOR_POS               7
 
-
 #define GCFG_INPUT_BIT                       (1 << 0)
 #define GCFG_OUTPUT_BIT                      (1 << 1)
 #define GCFG_INPUT_ENABLE_BIT                (1 << 2)
@@ -70,8 +70,6 @@
 #define GCFG_PULL_ENABLE_BIT                 (1 << 5)
 #define GCFG_FUNCTION_ENABLE_BIT             (1 << 6)
 #define GCFG_INPUT_MONITOR_BIT               (1 << 7)
-
-
 
 #define REG_GPIO_FUNC_CFG                    (GPIO_BASE_ADDR + 32*4)
 #define PERIAL_MODE_1                         (0)
@@ -101,9 +99,8 @@
 #else
 #define GPIO_EXTRAL_INT_MASK                  (DPLL_UNLOCK_INT | AUDIO_DPLL_UNLOCK_INT)
 #endif  // (CFG_SOC_NAME == SOC_BK7221U)
-
 #endif  //  (CFG_SOC_NAME == SOC_BK7231)
-                 
+
 #define REG_GPIO_DETECT                      (GPIO_BASE_ADDR + 39*4)
 #define IS_OVER_TEMP_DECT_BIT                 (1 << 0)
 #define IS_USB_PLUG_IN_BIT                    (1 << 1)
@@ -163,7 +160,6 @@
 #define GPIO_PCFG2_2_FUNC(x)                 (0x01UL << GPIO_PCFG2_POSI(x))
 #define GPIO_PCFG2_3_FUNC(x)                 (0x02UL << GPIO_PCFG2_POSI(x))
 #define GPIO_PCFG2_4_FUNC(x)                 (0x03UL << GPIO_PCFG2_POSI(x))
-
 
 // for GPIO 32-39
 #define REG_GPIO_FUNC_CFG_3                  (GPIO_BASE_ADDR + 47*4)

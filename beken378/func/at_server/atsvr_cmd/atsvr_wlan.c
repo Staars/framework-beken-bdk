@@ -617,6 +617,7 @@ int judge_the_string_is_ipv4_string(char *is_ip_string)
 					return -1;
 				}
 			}
+
 			ip_num[j] = '\0';
 			num = atoi( ip_num );
 			if(num < 0 || num > 255){

@@ -51,6 +51,11 @@
 
 #define TVIDEO_RXBUF_LEN            (TVIDEO_RXNODE_SIZE_UDP * 4)
 
+#define TVIDEO_STATUS_INIT          0
+#define TVIDEO_STATUS_OPENED        1
+#define TVIDEO_STATUS_RUNNING       2
+#define TVIDEO_STATUS_EXIT          3
+
 UINT8 tvideo_rxbuf[TVIDEO_RXBUF_LEN];
 TVIDEO_DESC_ST tvideo_st;
 
@@ -85,6 +90,8 @@ typedef struct tvideo_pool_st
     UINT16 pkt_header_size;
     tvideo_add_pkt_header add_pkt_header;
     #endif
+
+    UINT32 status;
 } TVIDEO_POOL_ST, *TVIDEO_POOL_PTR;
 
 TVIDEO_POOL_ST tvideo_pool;
@@ -392,6 +399,8 @@ static void video_transfer_main(beken_thread_arg_t data)
     OSStatus err;
     TVIDEO_PRT("video_transfer_main entry\r\n");
 
+    tvideo_pool.status = TVIDEO_STATUS_INIT;
+
     tvideo_pool_init(data);
     tvideo_config_desc();
 
@@ -404,15 +413,20 @@ static void video_transfer_main(beken_thread_arg_t data)
         }
         else //if(tvideo_pool.open_type == TVIDEO_OPEN_SCCB)
         {
-            camera_intfer_init(&tvideo_st);
+            if(camera_intfer_init(&tvideo_st) != 1)
+            {
+                goto tvideo_exit;
+            }
         }
     }
+    tvideo_pool.status = TVIDEO_STATUS_OPENED;
 
     if (tvideo_pool.start_cb != NULL)
     {
         tvideo_pool.start_cb();
     }
 
+    tvideo_pool.status = TVIDEO_STATUS_RUNNING;
     while (1)
     {
         TV_MSG_T msg;
@@ -434,14 +448,15 @@ static void video_transfer_main(beken_thread_arg_t data)
             }
         }
     }
+    tvideo_pool.status = TVIDEO_STATUS_EXIT;
+
+tvideo_exit:
+    TVIDEO_PRT("video_transfer_main exit\r\n");
 
     if (tvideo_pool.end_cb != NULL)
     {
         tvideo_pool.end_cb();
     }
-
-tvideo_exit:
-    TVIDEO_PRT("video_transfer_main exit\r\n");
 
     if (tvideo_pool.pool)
     {
@@ -476,6 +491,7 @@ int video_transfer_init(TVIDEO_SETUP_DESC_PTR setup_cfg)
 
     if ((!tvideo_thread_hdl) && (!tvideo_msg_que))
     {
+        int init_ret = kNoErr;
         // bakup setup_cfg, because of that 'setup_cfg' may not static value.
         os_memcpy(&video_transfer_setup_bak, setup_cfg, sizeof(TVIDEO_SETUP_DESC_ST));
 
@@ -490,21 +506,47 @@ int video_transfer_init(TVIDEO_SETUP_DESC_PTR setup_cfg)
         }
 
         ret = rtos_create_thread(&tvideo_thread_hdl,
-                                 4,
+                                 2,
                                  "video_intf",
                                  (beken_thread_function_t)video_transfer_main,
                                  1024,
                                  (beken_thread_arg_t)&video_transfer_setup_bak);
         if (ret != kNoErr)
         {
+            init_ret = kGeneralErr;
+        }
+        else
+        {
+            beken_time_t start_tick = rtos_get_time();
+            while(1)  // 5s
+            {
+                if(tvideo_pool.status >= TVIDEO_STATUS_OPENED)
+                {
+                    init_ret = kNoErr;
+                    break;
+                }
+                else
+                {
+                    if((rtos_get_time() - start_tick) <= 2000) // 2s
+                        rtos_delay_milliseconds(10);
+                    else
+                    {
+                        init_ret = kTimeoutErr;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if(init_ret != kNoErr)
+        {
             rtos_deinit_queue(&tvideo_msg_que);
             tvideo_msg_que = NULL;
             tvideo_thread_hdl = NULL;
-            TVIDEO_FATAL("Error: Failed to create spidma_intfer: %d\r\n", ret);
-            return kGeneralErr;
+            TVIDEO_FATAL("Error: Failed to video transfer init\r\n");
         }
 
-        return kNoErr;
+        return init_ret;
     }
     else
     {

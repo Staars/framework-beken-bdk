@@ -34,6 +34,7 @@
 #include "lwip/sockets.h"
 #include "mem_pub.h"
 #include "str_pub.h"
+#include "uart_pub.h"
 
 #define tcp_server_log(M, ...) os_printf("TCP", M, ##__VA_ARGS__)
 

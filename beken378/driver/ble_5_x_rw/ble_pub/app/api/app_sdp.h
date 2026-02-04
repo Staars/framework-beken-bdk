@@ -69,6 +69,9 @@ extern uint8_t appm_read_service_userDesc_by_handle_req(uint8_t conidx,uint16_t 
 
 extern uint8_t app_sdp_add_element_srv(uint8_t conidx,struct gattc_sdp_svc_ind const *ind);
 
+extern void register_app_sdp_service_tab(unsigned char service_tab_nb,app_sdp_service_uuid *service_tab);
+extern void app_sdp_service_filtration(int en);
+
 #endif  ////BLE_CENTRAL
 #endif  ///_APP_SDP_H_
 

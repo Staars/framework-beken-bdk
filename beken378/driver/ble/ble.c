@@ -5,6 +5,7 @@
 #include "ble.h"
 #include "ble_pub.h"
 #include "ble_api.h"
+#include "BK3435_reg.h"
 #include "rwble.h"
 #include "app_task.h"
 #include "udebug.h"
@@ -13,7 +14,6 @@
 #include "icu_pub.h"
 #include "intc_pub.h"
 #include "common_bt.h"
-#include "arm_arch.h"
 #include "rw_pub.h"
 #include "power_save_pub.h"
 #include "gapc_task.h" 
@@ -451,89 +451,53 @@ void ble_exit(void)
 
 UINT32 ble_ctrl( UINT32 cmd, void *param )
 {
-    UINT32 reg;
+	UINT32 reg;
 	UINT32 ret = ERR_SUCCESS;
 
-	switch(cmd)
-	{
+	switch (cmd) {
 	case CMD_BLE_REG_INIT:
 		break;
-		
+
 	case CMD_BLE_REG_DEINIT:
 		break;
 
-    case CMD_BLE_SET_CHANNEL:
-        reg = REG_READ(REG_BLE_XVR_CHANNEL_CONFIG_ADDR);
-        reg &= ~(REG_BLE_XVR_CHANNEL_VALUE_MASK << REG_BLE_XVR_CHANNEL_VALUE_POST);
-        reg |= (*(UINT32 *)param) << REG_BLE_XVR_CHANNEL_VALUE_POST;
-        REG_WRITE(REG_BLE_XVR_CHANNEL_CONFIG_ADDR, reg);
-        reg = REG_READ(REG_BLE_XVR_TRX_CONFIG_ADDR);
-        reg &= ~(1 << REG_BLE_XVR_TEST_RADIO_POST);
-        REG_WRITE(REG_BLE_XVR_TRX_CONFIG_ADDR, reg);
-        delay(10);
-        reg |= (1 << REG_BLE_XVR_TEST_RADIO_POST);
-        REG_WRITE(REG_BLE_XVR_TRX_CONFIG_ADDR, reg);
-        break;
+	case CMD_BLE_SET_CHANNEL:
+		reg = REG_READ(BLE_XVR_REG24);
+		reg &= ~(BLE_XVR_CHAN_MASK << BLE_XVR_CHAN_POST);
+		reg |= (*(UINT32 *)param) << BLE_XVR_CHAN_POST;
+		REG_WRITE(BLE_XVR_REG24, reg);
+		break;
 
-    case CMD_BLE_AUTO_CHANNEL_ENABLE:
-        reg = REG_READ(REG_BLE_XVR_CHANNEL_CONFIG_ADDR);
-        reg |= 1 << REG_BLE_XVR_AUTO_CHANNEL_POST;
-        REG_WRITE(REG_BLE_XVR_CHANNEL_CONFIG_ADDR, reg);
-        break;
+	case CMD_BLE_START_TX:
+		reg = REG_READ(BLE_XVR_REG24);
+		reg &= ~(BLE_XVR_AUTO_CHAN_MASK << BLE_XVR_AUTO_CHAN_POST);
+		REG_WRITE(BLE_XVR_REG24, reg);
+		if ((*(UINT8 *)param) == 0x00) {
+			reg = 0x3800;
+		} else if ((*(UINT8 *)param) == 0x01) {
+			reg = 0x3100;
+		} else {
+			bk_printf("unknow ble test mode\r\n");
+		}
+		REG_WRITE(BLE_XVR_REG25, reg);
+		break;
 
-    case CMD_BLE_AUTO_CHANNEL_DISABLE:
-        reg = REG_READ(REG_BLE_XVR_CHANNEL_CONFIG_ADDR);
-        reg &= ~(1 << REG_BLE_XVR_AUTO_CHANNEL_POST);
-        REG_WRITE(REG_BLE_XVR_CHANNEL_CONFIG_ADDR, reg);
-        break;
-
-    case CMD_BLE_AUTO_SYNCWD_ENABLE:
-        reg = REG_READ(REG_BLE_XVR_CHANNEL_CONFIG_ADDR);
-        reg |= 1 << REG_BLE_XVR_AUTO_SYNCWD_POST;
-        REG_WRITE(REG_BLE_XVR_CHANNEL_CONFIG_ADDR, reg);
-        break;
-
-    case CMD_BLE_AUTO_SYNCWD_DISABLE:
-        reg = REG_READ(REG_BLE_XVR_CHANNEL_CONFIG_ADDR);
-        reg &= ~(1 << REG_BLE_XVR_AUTO_SYNCWD_POST);
-        REG_WRITE(REG_BLE_XVR_CHANNEL_CONFIG_ADDR, reg);
-        break;
-
-    case CMD_BLE_SET_PN9_TRX:
-        ble_set_pn9_trx(*(UINT32 *)param);
-        break;
-
-    case CMD_BLE_SET_GFSK_SYNCWD:
-        reg = (*(UINT32 *)param);
-        REG_WRITE(REG_BLE_XVR_GFSK_SYNCWD_ADDR, reg);
-        break;
-
-    case CMD_BLE_HOLD_PN9_ESTIMATE:
-        reg = REG_READ(REG_BLE_XVR_TRX_CONFIG_ADDR);
-        reg |= 1 << REG_BLE_XVR_HOLD_ESTIMATE_POST;
-        REG_WRITE(REG_BLE_XVR_TRX_CONFIG_ADDR, reg);
-        break;
-
-    case CMD_BLE_STOP_COUNTING:
-        reg = REG_READ(REG_BLE_XVR_TRX_CONFIG_ADDR);
-        reg &= ~(1 << REG_BLE_XVR_PN9_RECV_POST);
-        REG_WRITE(REG_BLE_XVR_TRX_CONFIG_ADDR, reg);
-        break;
-
-    case CMD_BLE_START_COUNTING:
-        reg = REG_READ(REG_BLE_XVR_TRX_CONFIG_ADDR);
-        reg |= 1 << REG_BLE_XVR_PN9_RECV_POST;
-        reg &= ~(1 << REG_BLE_XVR_HOLD_ESTIMATE_POST);
-        REG_WRITE(REG_BLE_XVR_TRX_CONFIG_ADDR, reg);
-        break;
+	case CMD_BLE_STOP_TX:
+		reg = REG_READ(BLE_XVR_REG24);
+		reg |= (BLE_XVR_AUTO_CHAN_MASK << BLE_XVR_AUTO_CHAN_POST);
+		REG_WRITE(BLE_XVR_REG24, reg);
+		reg = 0;
+		REG_WRITE(BLE_XVR_REG25, reg);
+		break;
 
 	default:
 		ret = ERR_CMD_NOT_SUPPORT;
-        break;
+		break;
 	}
-	
+
 	return ret;
 }
+
 
 void ble_isr(void)
 {

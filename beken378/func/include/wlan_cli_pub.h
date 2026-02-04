@@ -10,9 +10,6 @@
 #define __WLAN_CLI_PUB_H__
 
 #include "include.h"
-#include "BkDriverUart.h"
-
-#define CLI_UART                      BK_UART_2
 
 #define RX_WAIT                       BEKEN_WAIT_FOREVER
 #define SEND_WAIT                     BEKEN_WAIT_FOREVER
@@ -23,9 +20,9 @@
 #define EXIT_MSG		              "exit"
 
 #define NUM_BUFFERS		              1
-#define MAX_COMMANDS	              128
-#define INBUF_SIZE                    128
-#define OUTBUF_SIZE                   2048
+#define MAX_CMD_COUNT	              128
+#define IN_BUF_LEN                    128
+#define OUT_BUF_LEN                   2048
 
 #define LOG_SERVICE_BUFLEN            100
 
@@ -43,14 +40,14 @@ struct cli_command
 struct cli_st
 {
     int initialized;
-    const struct cli_command *commands[MAX_COMMANDS];
+    const struct cli_command *commands[MAX_CMD_COUNT];
     unsigned int num_commands;
     int echo_disabled;
 	
     unsigned int bp;	/* buffer pointer */
-    char inbuf[INBUF_SIZE];
+    char inbuf[IN_BUF_LEN];
 	
-    char outbuf[OUTBUF_SIZE];
+    char outbuf[OUT_BUF_LEN];
 } ;
 
 

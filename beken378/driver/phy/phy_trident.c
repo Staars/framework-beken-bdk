@@ -2968,12 +2968,13 @@ void phy_init(const struct phy_cfg_tag *config)
     PHY_WPRT("phy_init-->RC_PATHs=0x%X , RF_PATHS=0x%X\n", phy_env->rc_path_sel, phy_env->rf_path_sel);
 
     //PHY blocks initialization-----------------------------------------------------------
-    //TRIDENT components
-    phy_trident_init();
 #if (CFG_SOC_NAME == SOC_BK7238)
     /* huaming suggest to config it bedore rf setting */
     mdm_fe1clkforce_setf(1);
 #endif
+
+    //TRIDENT components
+    phy_trident_init();
 
     //Radios alone through RC
     phy_rf_init();
@@ -3540,7 +3541,7 @@ void phy_get_rf_gain_capab(int8_t *max, int8_t *min)
 }
 #if (1 == CFG_LOW_VOLTAGE_PS)
 
-#define CFG_USE_11B_LOW_POWER   1
+#define CFG_USE_11B_LOW_POWER   0
 #if CFG_USE_11B_LOW_POWER
 uint8_t enter_11b_flag = 0;
 #endif

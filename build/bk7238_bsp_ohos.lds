@@ -90,9 +90,15 @@ SECTIONS
 	} > flash
 
 	. = ORIGIN(ram);
+/* keep stack front of RAM to avoid COLOR reset to zero */
+	.stack ALIGN(8):
+	{
+		*boot_handlers.O(.bss .bss.* .scommon .sbss .dynbss COMMON)
+	} > ram						/* in RAM */
+
 /* globals.for example: int ram_data[3]={4,5,6}; */		/* VMA in RAM, but keep LMA in flash */
 	_begin_data = .;
-	.data :
+	.data ALIGN(8):
 	{
 		*(.data .data.*)
 		*(.sdata)
@@ -110,7 +116,6 @@ SECTIONS
 	.bss ALIGN(8):
 	{
 		_bss_start = .;
-		*boot_handlers.O(.bss .bss.* .scommon .sbss .dynbss COMMON)
 		*(.bss .bss.*)
 		*(.scommon)
 		*(.sbss)

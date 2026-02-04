@@ -121,7 +121,7 @@ SECTIONS
 	    *drv_model.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *intc.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *role_launch.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
-	    *manual_cal_bk7231U.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
+	    *manual_cal_bk7231u.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *main_none.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *eloop.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *main_supplicant.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
@@ -143,7 +143,7 @@ SECTIONS
 		*common.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 
 	    /* beken_sdk */
-		*bk7231N_cal.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
+		*bk7231n_cal.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *fake_clock.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 	    *tx_evm.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
 		*param_config.o(.bss .bss.* .scommon .sbss .dynbss COMMON)
@@ -295,10 +295,16 @@ SECTIONS
     _tcmbss_start = ADDR(.tcm);
     _tcmbss_end = _tcmbss_start + SIZEOF(.tcm);
 
-    . = ORIGIN(ram);
+	. = ORIGIN(ram);
+/* keep stack front of RAM to avoid COLOR reset to zero */
+	.stack ALIGN(8):
+	{
+		*boot_handlers.O(.bss .bss.* .scommon .sbss .dynbss COMMON)
+	} > ram						/* in RAM */
+
 /* globals.for example: int ram_data[3]={4,5,6}; */		/* VMA in RAM, but keep LMA in flash */
 	_begin_data = .;
-        .data :
+	.data ALIGN(8):
 	{
 	    *(.data .data.*)
 	    *(.sdata) 
@@ -316,7 +322,6 @@ SECTIONS
 	.bss ALIGN(8):
 	{
 		_bss_start = .;
-		*boot_handlers.O(.bss .bss.* .scommon .sbss .dynbss COMMON)
 		*(.bss .bss.*)
 		*(.scommon)
 		*(.sbss)

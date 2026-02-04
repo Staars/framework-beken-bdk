@@ -883,7 +883,9 @@ TickType_t xTimeNow;
 				case tmrCOMMAND_START_DONT_TRACE :
 					#if ( configTIMER_STATE == 1 )
 						if ( ( xMessage.xMessageID == tmrCOMMAND_START_DONT_TRACE ) && ( prvTimerIsStopped(pxTimer) ) ) {
+							#if(CFG_LOW_VOLTAGE_PS == 0)
 							bk_printf("skip timer=%p don't trace cmd since it's stopped!\n", pxTimer);
+							#endif
 							break;
 						}
 
@@ -954,7 +956,9 @@ TickType_t xTimeNow;
 					{
 						prvClearQueuedMsg(pxTimer);
 						//Trigger beneken timer to set the state to BEKEN_TIMER_DELETED
-						pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
+						void *time_id = pvTimerGetTimerID(pxTimer);
+						if(time_id != NULL)
+							pxTimer->pxCallbackFunction( ( TimerHandle_t ) pxTimer );
 					}
 					#endif
 

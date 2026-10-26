@@ -5318,7 +5318,16 @@ static void ssl_calc_finished_tls_sha384(
              ? "client finished"
              : "server finished";
 
+    /* fin_sha512 is started as SHA-384, so finish writes only 48 bytes; GCC
+     * checks against the output[64] parameter declaration instead. */
+#if defined(__GNUC__) && __GNUC__ >= 11
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
     mbedtls_sha512_finish( &sha512, padbuf );
+#if defined(__GNUC__) && __GNUC__ >= 11
+#pragma GCC diagnostic pop
+#endif
 
     ssl->handshake->tls_prf( session->master, 48, sender,
                              padbuf, 48, buf, len );

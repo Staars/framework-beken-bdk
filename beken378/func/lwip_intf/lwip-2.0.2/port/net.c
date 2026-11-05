@@ -255,7 +255,7 @@ static void wm_netif_status_static_callback(struct netif *n)
     if (n->flags & NETIF_FLAG_UP)
     {
         // static IP success;
-        os_printf("\r\n using static ip: %u.%u.%u.%u \r\n", BK_IP4_STR(n->ip_addr.addr));
+        os_printf("\r\n using static ip: %u.%u.%u.%u \r\n", BK_IP4_STR(ip4_addr_get_u32(netif_ip4_addr(n))));
         mhdr_set_station_stage(RW_STG_STA_COMPLETE);
         mhdr_set_station_status(RW_EVT_STA_GOT_IP);/* dhcp success*/
 

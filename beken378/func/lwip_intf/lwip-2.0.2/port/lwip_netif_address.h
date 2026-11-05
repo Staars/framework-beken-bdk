@@ -15,6 +15,11 @@
 #ifndef _MXCHIP_NETIF_ADDR_H_
 #define _MXCHIP_NETIF_ADDR_H_
 
+#include "typedef.h"
+#if LWIP_IPV6
+#include "lwip/ip6_addr.h"
+#endif
+
 /** MLAN BSS type */
 typedef enum _wifi_interface_type
 {

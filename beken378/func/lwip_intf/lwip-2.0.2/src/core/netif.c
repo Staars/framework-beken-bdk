@@ -1192,7 +1192,9 @@ netif_create_ip6_linklocal_address(struct netif *netif, u8_t from_mac_48bit)
 {
   u8_t i, addr_index;
 
-  /* Link-local prefix. */
+  /* Link-local prefix. netif_add() leaves slot 0 untyped, so tag it here:
+   * a zero (IPv4) type makes UDP sends from this source fail with ERR_VAL. */
+  IP_SET_TYPE_VAL(netif->ip6_addr[0], IPADDR_TYPE_V6);
   ip_2_ip6(&netif->ip6_addr[0])->addr[0] = PP_HTONL(0xfe800000ul);
   ip_2_ip6(&netif->ip6_addr[0])->addr[1] = 0;
 
